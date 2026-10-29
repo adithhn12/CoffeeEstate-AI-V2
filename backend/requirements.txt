@@ -1,0 +1,31 @@
+# Coffee Estate AI — Backend Dependencies
+# Python 3.10+ compatible (tested on Python 3.12.10)
+
+# Web Framework & Server
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.8.0
+python-multipart>=0.0.9
+
+# Database & ORM
+sqlalchemy>=2.0.0
+
+# Computer Vision & Deep Learning
+# For GPU acceleration (NVIDIA CUDA 12.1+), install PyTorch with CUDA:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+# For standard CPU execution:
+#   pip install torch torchvision
+torch>=2.2.0
+torchvision>=0.17.0
+ultralytics>=8.2.0
+opencv-python>=4.8.0
+pillow>=10.0.0
+numpy>=1.26.0
+
+# Scientific, Linear Programming & Configuration
+scipy>=1.13.0
+pyyaml>=6.0
+
+# HTTP & Weather API Client
+requests>=2.31.0
+

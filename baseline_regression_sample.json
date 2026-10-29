@@ -1,0 +1,1404 @@
+{
+  "section_id": 1,
+  "section_name": "Valley Block A (Arabica Selection 795)",
+  "total_images_analyzed": 1,
+  "aggregated_total_cherries": 79,
+  "avg_red_pct": 83.5,
+  "avg_yellow_pct": 6.3,
+  "avg_green_pct": 8.9,
+  "avg_dark_brown_pct": 1.3,
+  "avg_low_visibility_pct": 0.0,
+  "overall_maturity_stage": "Optimal Harvest Window",
+  "maturity_recommendation": "83.5% ripe red cherries among discernible fruit. Peak maturity for washed Arabica (Plantation Grade A). High mucilage sugar Brix accumulation.",
+  "individual_results": [
+    {
+      "id": 33,
+      "section_id": 1,
+      "original_filename": "1687438155343.jpg",
+      "storage_path": "uploads/raw/20261023_212557_0a258a1c1c.jpg",
+      "annotated_storage_path": "uploads/annotated/20261023_212557_0a258a1c1c_annotated.jpg",
+      "uploaded_at": "2026-10-23T15:55:57.746659",
+      "analyzed_at": "2026-10-23T15:55:57.746659",
+      "model_version": "YOLOv8-Croppie-Finetuned-v1.1",
+      "model_status_at_inference": "Trained on Croppie Coffee dataset (Uganda Public v1.0 - Awaiting Coorg Local Validation)",
+      "inference_time_ms": 63.73,
+      "confidence_threshold": 0.25,
+      "total_cherries": 79,
+      "dark_brown_count": 1,
+      "green_count": 7,
+      "low_visibility_count": 0,
+      "red_count": 66,
+      "yellow_count": 5,
+      "dark_brown_pct": 1.27,
+      "green_pct": 8.86,
+      "low_visibility_pct": 0.0,
+      "red_pct": 83.54,
+      "yellow_pct": 6.33,
+      "maturity_stage": "Optimal Harvest Window",
+      "maturity_notes": "83.5% ripe red cherries among discernible fruit. Peak maturity for washed Arabica (Plantation Grade A). High mucilage sugar Brix accumulation.",
+      "detections": [
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.9146,
+          "bbox": [
+            0.29667,
+            0.17812,
+            0.03796,
+            0.02912
+          ],
+          "pixel_coords": [
+            133,
+            104,
+            151,
+            123
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.9021,
+          "bbox": [
+            0.24407,
+            0.26607,
+            0.03901,
+            0.02808
+          ],
+          "pixel_coords": [
+            107,
+            161,
+            126,
+            179
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8975,
+          "bbox": [
+            0.29838,
+            0.15495,
+            0.04275,
+            0.02907
+          ],
+          "pixel_coords": [
+            132,
+            89,
+            153,
+            108
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8876,
+          "bbox": [
+            0.36099,
+            0.75798,
+            0.04324,
+            0.0318
+          ],
+          "pixel_coords": [
+            162,
+            474,
+            183,
+            495
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8752,
+          "bbox": [
+            0.35987,
+            0.80201,
+            0.03715,
+            0.02941
+          ],
+          "pixel_coords": [
+            163,
+            503,
+            181,
+            522
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.869,
+          "bbox": [
+            0.21769,
+            0.27849,
+            0.04132,
+            0.0278
+          ],
+          "pixel_coords": [
+            94,
+            169,
+            114,
+            187
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8531,
+          "bbox": [
+            0.26896,
+            0.04026,
+            0.04238,
+            0.03227
+          ],
+          "pixel_coords": [
+            118,
+            15,
+            139,
+            36
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8493,
+          "bbox": [
+            0.2948,
+            0.31968,
+            0.03662,
+            0.02977
+          ],
+          "pixel_coords": [
+            132,
+            195,
+            150,
+            214
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8456,
+          "bbox": [
+            0.30194,
+            0.05357,
+            0.03277,
+            0.02856
+          ],
+          "pixel_coords": [
+            137,
+            25,
+            152,
+            43
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8414,
+          "bbox": [
+            0.25003,
+            0.31393,
+            0.03825,
+            0.0304
+          ],
+          "pixel_coords": [
+            110,
+            191,
+            129,
+            210
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8304,
+          "bbox": [
+            0.31809,
+            0.30347,
+            0.0395,
+            0.02798
+          ],
+          "pixel_coords": [
+            143,
+            185,
+            162,
+            203
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8283,
+          "bbox": [
+            0.27662,
+            0.06667,
+            0.03955,
+            0.03077
+          ],
+          "pixel_coords": [
+            123,
+            32,
+            142,
+            52
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8241,
+          "bbox": [
+            0.31744,
+            0.101,
+            0.03438,
+            0.03293
+          ],
+          "pixel_coords": [
+            144,
+            54,
+            160,
+            75
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8147,
+          "bbox": [
+            0.2562,
+            0.18998,
+            0.0342,
+            0.03142
+          ],
+          "pixel_coords": [
+            114,
+            111,
+            131,
+            131
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8035,
+          "bbox": [
+            0.2516,
+            0.05896,
+            0.0348,
+            0.03315
+          ],
+          "pixel_coords": [
+            112,
+            27,
+            129,
+            48
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8024,
+          "bbox": [
+            0.31016,
+            0.50658,
+            0.03849,
+            0.02932
+          ],
+          "pixel_coords": [
+            139,
+            314,
+            158,
+            333
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.8024,
+          "bbox": [
+            0.30117,
+            0.38835,
+            0.03587,
+            0.03219
+          ],
+          "pixel_coords": [
+            135,
+            238,
+            153,
+            258
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7948,
+          "bbox": [
+            0.24028,
+            0.39366,
+            0.05103,
+            0.03039
+          ],
+          "pixel_coords": [
+            103,
+            242,
+            127,
+            261
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7896,
+          "bbox": [
+            0.30625,
+            0.8033,
+            0.03886,
+            0.02684
+          ],
+          "pixel_coords": [
+            137,
+            505,
+            156,
+            522
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7893,
+          "bbox": [
+            0.3531,
+            0.94437,
+            0.03975,
+            0.03306
+          ],
+          "pixel_coords": [
+            159,
+            593,
+            179,
+            614
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7872,
+          "bbox": [
+            0.24914,
+            0.41371,
+            0.04082,
+            0.02912
+          ],
+          "pixel_coords": [
+            109,
+            255,
+            129,
+            274
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7823,
+          "bbox": [
+            0.3191,
+            0.07609,
+            0.0334,
+            0.02825
+          ],
+          "pixel_coords": [
+            145,
+            39,
+            161,
+            57
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7689,
+          "bbox": [
+            0.2415,
+            0.15395,
+            0.0425,
+            0.03013
+          ],
+          "pixel_coords": [
+            105,
+            88,
+            126,
+            108
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.762,
+          "bbox": [
+            0.3205,
+            0.17313,
+            0.03913,
+            0.02965
+          ],
+          "pixel_coords": [
+            144,
+            101,
+            163,
+            120
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7587,
+          "bbox": [
+            0.31698,
+            0.82292,
+            0.04337,
+            0.0281
+          ],
+          "pixel_coords": [
+            141,
+            517,
+            162,
+            535
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7502,
+          "bbox": [
+            0.22486,
+            0.3012,
+            0.04068,
+            0.02646
+          ],
+          "pixel_coords": [
+            98,
+            184,
+            117,
+            201
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7464,
+          "bbox": [
+            0.30613,
+            0.87365,
+            0.03755,
+            0.03101
+          ],
+          "pixel_coords": [
+            137,
+            549,
+            155,
+            569
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7303,
+          "bbox": [
+            0.27892,
+            0.13379,
+            0.03572,
+            0.02679
+          ],
+          "pixel_coords": [
+            125,
+            77,
+            142,
+            94
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7271,
+          "bbox": [
+            0.32389,
+            0.39923,
+            0.03789,
+            0.03423
+          ],
+          "pixel_coords": [
+            146,
+            244,
+            164,
+            266
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7224,
+          "bbox": [
+            0.3895,
+            0.78994,
+            0.04577,
+            0.03413
+          ],
+          "pixel_coords": [
+            175,
+            494,
+            197,
+            516
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7196,
+          "bbox": [
+            0.32694,
+            0.7633,
+            0.04114,
+            0.02819
+          ],
+          "pixel_coords": [
+            147,
+            479,
+            166,
+            497
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7155,
+          "bbox": [
+            0.38439,
+            0.76279,
+            0.03876,
+            0.03206
+          ],
+          "pixel_coords": [
+            175,
+            477,
+            193,
+            498
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.7039,
+          "bbox": [
+            0.32454,
+            0.05225,
+            0.03182,
+            0.03227
+          ],
+          "pixel_coords": [
+            148,
+            23,
+            163,
+            43
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.6974,
+          "bbox": [
+            0.27876,
+            0.41987,
+            0.03286,
+            0.02801
+          ],
+          "pixel_coords": [
+            125,
+            259,
+            141,
+            277
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.696,
+          "bbox": [
+            0.31318,
+            0.14697,
+            0.03236,
+            0.02618
+          ],
+          "pixel_coords": [
+            142,
+            85,
+            158,
+            102
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.6857,
+          "bbox": [
+            0.30485,
+            0.41811,
+            0.03965,
+            0.03618
+          ],
+          "pixel_coords": [
+            136,
+            256,
+            155,
+            279
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.6851,
+          "bbox": [
+            0.27111,
+            0.08481,
+            0.03383,
+            0.02478
+          ],
+          "pixel_coords": [
+            122,
+            46,
+            138,
+            62
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.674,
+          "bbox": [
+            0.30388,
+            0.27905,
+            0.03291,
+            0.02562
+          ],
+          "pixel_coords": [
+            137,
+            170,
+            153,
+            186
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.6657,
+          "bbox": [
+            0.34439,
+            0.06253,
+            0.03682,
+            0.0256
+          ],
+          "pixel_coords": [
+            156,
+            31,
+            174,
+            48
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.6359,
+          "bbox": [
+            0.31176,
+            0.19431,
+            0.03688,
+            0.0279
+          ],
+          "pixel_coords": [
+            140,
+            115,
+            158,
+            133
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.6011,
+          "bbox": [
+            0.33075,
+            0.92636,
+            0.03856,
+            0.03592
+          ],
+          "pixel_coords": [
+            149,
+            581,
+            168,
+            604
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5985,
+          "bbox": [
+            0.33947,
+            0.08473,
+            0.03165,
+            0.02698
+          ],
+          "pixel_coords": [
+            155,
+            45,
+            170,
+            62
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.582,
+          "bbox": [
+            0.29831,
+            0.03099,
+            0.03851,
+            0.02992
+          ],
+          "pixel_coords": [
+            133,
+            10,
+            152,
+            29
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5724,
+          "bbox": [
+            0.30367,
+            0.37679,
+            0.04118,
+            0.02489
+          ],
+          "pixel_coords": [
+            135,
+            233,
+            155,
+            249
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.5686,
+          "bbox": [
+            0.309,
+            0.85063,
+            0.04453,
+            0.03091
+          ],
+          "pixel_coords": [
+            137,
+            534,
+            159,
+            554
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5681,
+          "bbox": [
+            0.32935,
+            0.87466,
+            0.03982,
+            0.03683
+          ],
+          "pixel_coords": [
+            148,
+            547,
+            167,
+            571
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5404,
+          "bbox": [
+            0.2471,
+            0.16625,
+            0.0447,
+            0.02532
+          ],
+          "pixel_coords": [
+            107,
+            98,
+            129,
+            114
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5298,
+          "bbox": [
+            0.40515,
+            0.90983,
+            0.03705,
+            0.03446
+          ],
+          "pixel_coords": [
+            185,
+            571,
+            203,
+            593
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5204,
+          "bbox": [
+            0.33246,
+            0.9011,
+            0.03413,
+            0.02721
+          ],
+          "pixel_coords": [
+            151,
+            567,
+            167,
+            585
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.5096,
+          "bbox": [
+            0.34754,
+            0.82087,
+            0.03574,
+            0.02616
+          ],
+          "pixel_coords": [
+            158,
+            516,
+            175,
+            533
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.4781,
+          "bbox": [
+            0.35106,
+            0.77951,
+            0.04631,
+            0.03032
+          ],
+          "pixel_coords": [
+            157,
+            489,
+            179,
+            508
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.4337,
+          "bbox": [
+            0.29758,
+            0.78177,
+            0.05992,
+            0.03254
+          ],
+          "pixel_coords": [
+            128,
+            489,
+            157,
+            510
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.4317,
+          "bbox": [
+            0.40098,
+            0.83881,
+            0.03849,
+            0.03037
+          ],
+          "pixel_coords": [
+            183,
+            527,
+            201,
+            546
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.4249,
+          "bbox": [
+            0.39454,
+            0.87643,
+            0.05226,
+            0.03133
+          ],
+          "pixel_coords": [
+            176,
+            550,
+            201,
+            570
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.4201,
+          "bbox": [
+            0.37413,
+            0.84811,
+            0.03693,
+            0.03209
+          ],
+          "pixel_coords": [
+            170,
+            532,
+            188,
+            553
+          ]
+        },
+        {
+          "class_id": 0,
+          "class_name": "dark_brown_cherry",
+          "confidence": 0.414,
+          "bbox": [
+            0.27263,
+            0.29931,
+            0.03701,
+            0.02595
+          ],
+          "pixel_coords": [
+            121,
+            183,
+            139,
+            199
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.4051,
+          "bbox": [
+            0.39352,
+            0.86502,
+            0.04894,
+            0.03414
+          ],
+          "pixel_coords": [
+            177,
+            542,
+            200,
+            564
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3901,
+          "bbox": [
+            0.38462,
+            0.90488,
+            0.03464,
+            0.03104
+          ],
+          "pixel_coords": [
+            176,
+            569,
+            192,
+            589
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3698,
+          "bbox": [
+            0.26556,
+            0.02856,
+            0.04158,
+            0.03513
+          ],
+          "pixel_coords": [
+            117,
+            7,
+            137,
+            29
+          ]
+        },
+        {
+          "class_id": 4,
+          "class_name": "yellow_cherry",
+          "confidence": 0.368,
+          "bbox": [
+            0.40203,
+            0.83833,
+            0.03842,
+            0.03133
+          ],
+          "pixel_coords": [
+            183,
+            526,
+            202,
+            546
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3612,
+          "bbox": [
+            0.29226,
+            0.1997,
+            0.03794,
+            0.03161
+          ],
+          "pixel_coords": [
+            131,
+            117,
+            149,
+            137
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3575,
+          "bbox": [
+            0.37743,
+            0.94933,
+            0.02998,
+            0.03006
+          ],
+          "pixel_coords": [
+            173,
+            597,
+            188,
+            617
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.3535,
+          "bbox": [
+            0.34255,
+            0.84372,
+            0.04084,
+            0.03204
+          ],
+          "pixel_coords": [
+            154,
+            529,
+            174,
+            550
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3483,
+          "bbox": [
+            0.40479,
+            0.89703,
+            0.04154,
+            0.0293
+          ],
+          "pixel_coords": [
+            184,
+            564,
+            204,
+            583
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3457,
+          "bbox": [
+            0.24502,
+            0.40458,
+            0.04711,
+            0.03817
+          ],
+          "pixel_coords": [
+            106,
+            246,
+            128,
+            271
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.3455,
+          "bbox": [
+            0.37662,
+            0.9283,
+            0.03672,
+            0.02864
+          ],
+          "pixel_coords": [
+            171,
+            584,
+            189,
+            603
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.344,
+          "bbox": [
+            0.25432,
+            0.42141,
+            0.0445,
+            0.03287
+          ],
+          "pixel_coords": [
+            111,
+            259,
+            132,
+            280
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3404,
+          "bbox": [
+            0.25463,
+            0.15595,
+            0.05552,
+            0.03186
+          ],
+          "pixel_coords": [
+            108,
+            89,
+            135,
+            110
+          ]
+        },
+        {
+          "class_id": 4,
+          "class_name": "yellow_cherry",
+          "confidence": 0.3289,
+          "bbox": [
+            0.39562,
+            0.86461,
+            0.04805,
+            0.03374
+          ],
+          "pixel_coords": [
+            178,
+            542,
+            201,
+            564
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.3179,
+          "bbox": [
+            0.36098,
+            0.88837,
+            0.04175,
+            0.03225
+          ],
+          "pixel_coords": [
+            163,
+            558,
+            183,
+            578
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.3069,
+          "bbox": [
+            0.38062,
+            0.81559,
+            0.03681,
+            0.03004
+          ],
+          "pixel_coords": [
+            173,
+            512,
+            191,
+            531
+          ]
+        },
+        {
+          "class_id": 4,
+          "class_name": "yellow_cherry",
+          "confidence": 0.2996,
+          "bbox": [
+            0.38532,
+            0.90443,
+            0.03504,
+            0.03052
+          ],
+          "pixel_coords": [
+            176,
+            569,
+            193,
+            588
+          ]
+        },
+        {
+          "class_id": 1,
+          "class_name": "green_cherry",
+          "confidence": 0.2933,
+          "bbox": [
+            0.2972,
+            0.01185,
+            0.0549,
+            0.0235
+          ],
+          "pixel_coords": [
+            129,
+            0,
+            155,
+            15
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.2806,
+          "bbox": [
+            0.34849,
+            0.9213,
+            0.0399,
+            0.03065
+          ],
+          "pixel_coords": [
+            157,
+            579,
+            176,
+            599
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.277,
+          "bbox": [
+            0.35884,
+            0.7693,
+            0.05138,
+            0.03192
+          ],
+          "pixel_coords": [
+            159,
+            482,
+            184,
+            502
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.27,
+          "bbox": [
+            0.39198,
+            0.79821,
+            0.05101,
+            0.03045
+          ],
+          "pixel_coords": [
+            175,
+            501,
+            200,
+            520
+          ]
+        },
+        {
+          "class_id": 3,
+          "class_name": "red_cherry",
+          "confidence": 0.2674,
+          "bbox": [
+            0.33209,
+            0.80518,
+            0.03163,
+            0.02473
+          ],
+          "pixel_coords": [
+            151,
+            507,
+            166,
+            523
+          ]
+        },
+        {
+          "class_id": 4,
+          "class_name": "yellow_cherry",
+          "confidence": 0.2579,
+          "bbox": [
+            0.35484,
+            0.86417,
+            0.04081,
+            0.03059
+          ],
+          "pixel_coords": [
+            160,
+            543,
+            180,
+            562
+          ]
+        },
+        {
+          "class_id": 4,
+          "class_name": "yellow_cherry",
+          "confidence": 0.2512,
+          "bbox": [
+            0.35653,
+            0.91732,
+            0.03793,
+            0.03188
+          ],
+          "pixel_coords": [
+            162,
+            576,
+            180,
+            597
+          ]
+        }
+      ],
+      "is_sample_data": false,
+      "evaluable_cherries": 79,
+      "evaluable_red_pct": 83.54,
+      "evaluable_yellow_pct": 6.33,
+      "evaluable_green_pct": 8.86,
+      "evaluable_dark_brown_pct": 1.27,
+      "uncertain_cherries": 0,
+      "uncertain_pct": 0.0,
+      "mean_confidence": 0.5937,
+      "denominator_note": "Percentages breakdown: visual shares (red_pct, etc.) use total_cherries denominator. Derived maturity shares use evaluable_cherries denominator (excluding low_visibility_unsure).",
+      "yield_disclaimer": "PHOTOGRAPHIC SAMPLING NOTICE: Cherry counts are detected from 2D photographs of canopy branches. They indicate sampling density and maturity distribution, not total plantation yield per acre."
+    }
+  ],
+  "aggregated_evaluable_cherries": 79,
+  "avg_evaluable_red_pct": 83.5,
+  "avg_evaluable_yellow_pct": 6.3,
+  "avg_evaluable_green_pct": 8.9,
+  "avg_evaluable_dark_brown_pct": 1.3,
+  "avg_uncertain_pct": 0.0,
+  "photographic_yield_disclaimer": "PHOTOGRAPHIC SAMPLING NOTICE: Cherry counts are detected from 2D photographs of canopy branches. They indicate sampling density and maturity distribution, not total plantation yield per acre."
+}

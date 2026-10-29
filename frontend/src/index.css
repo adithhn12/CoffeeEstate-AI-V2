@@ -1,0 +1,69 @@
+@import 'leaflet/dist/leaflet.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-[#faf8f5] text-stone-900 antialiased font-sans selection:bg-estate-200 selection:text-estate-950;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Optimize font readability on mobile screens */
+  h1, h2, h3, h4 {
+    @apply text-stone-950 font-semibold tracking-tight;
+  }
+}
+
+@layer components {
+  /* Warm tactile card with subtle natural shadow and border */
+  .card-mobile {
+    @apply bg-white border border-stone-200/90 rounded-2xl shadow-sm transition-all duration-150;
+  }
+
+  .card-mobile-interactive {
+    @apply card-mobile active:scale-[0.99] hover:border-estate-400 hover:shadow-sm cursor-pointer;
+  }
+
+  /* Agricultural touch-friendly primary button (min 48px height on touch) */
+  .btn-touch-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-3.5 bg-estate-900 hover:bg-estate-800 active:bg-estate-950 text-white font-medium rounded-xl shadow-sm text-base transition-colors duration-150 min-h-[48px] touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  /* Secondary button with clear border */
+  .btn-touch-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-stone-50 active:bg-stone-100 text-stone-800 font-medium border border-stone-300 rounded-xl shadow-sm text-sm sm:text-base transition-colors duration-150 min-h-[44px] touch-manipulation disabled:opacity-50;
+  }
+
+  /* Soft natural state badges */
+  .badge-sage {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-estate-100 text-estate-900 border border-estate-300/80;
+  }
+
+  .badge-amber-warm {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-900 border border-amber-300/80;
+  }
+
+  .badge-rose-restrained {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-900 border border-rose-300/80;
+  }
+
+  .badge-stone-neutral {
+    @apply inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-stone-100 text-stone-800 border border-stone-300/80;
+  }
+
+  /* Form touch inputs */
+  .input-touch {
+    @apply w-full px-4 py-3 text-base sm:text-sm bg-white border border-stone-300 rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-estate-700 focus:border-estate-700 min-h-[48px] transition-colors;
+  }
+
+  /* Safe padding for bottom navigation bar */
+  .pb-mobile-nav {
+    padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+  }
+}

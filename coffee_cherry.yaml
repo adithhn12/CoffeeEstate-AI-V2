@@ -1,0 +1,16 @@
+# YOLOv8 / YOLOv11 Dataset Configuration for Croppie Coffee Dataset
+
+path: datasets/croppie_coffee/extracted
+train: train/images
+val: val/images
+
+# Number of classes
+nc: 5
+
+# Class names
+names:
+  0: dark_brown_cherry
+  1: green_cherry
+  2: low_visibility_unsure
+  3: red_cherry
+  4: yellow_cherry
