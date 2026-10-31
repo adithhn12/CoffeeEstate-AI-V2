@@ -92,7 +92,7 @@ async def upload_and_analyze_cherries(
                 raise e
             raise HTTPException(status_code=500, detail=f"Failed to save upload '{file.filename}': {str(e)}")
 
-        # 3. Run Vision Pipeline
+        # 3. Run Vision Pipeline & Validate Image Content
         try:
             analysis_dict = vision_service.analyze_image(
                 image_path=raw_path,
@@ -100,7 +100,31 @@ async def upload_and_analyze_cherries(
                 save_annotated=True,
                 variety=inferred_variety
             )
+            
+            # Additional direct validation check inside the route loop
+            evaluable_count = (
+                analysis_dict.get("red_count", 0) +
+                analysis_dict.get("yellow_count", 0) +
+                analysis_dict.get("green_count", 0) +
+                analysis_dict.get("dark_brown_count", 0)
+            )
+            if analysis_dict.get("total_cherries", 0) < 3 or evaluable_count == 0:
+                raise ValueError("This does not look like a correct image of coffee cherries. Please upload a valid coffee branch image.")
+
+        except ValueError as ve:
+            # Clean up the raw file if it fails validation
+            if os.path.exists(raw_path):
+                try:
+                    os.remove(raw_path)
+                except Exception:
+                    pass
+            raise HTTPException(
+                status_code=400,
+                detail=str(ve)
+            )
         except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
             raise HTTPException(
                 status_code=422,
                 detail=f"Error analyzing image '{file.filename}': {str(e)}"

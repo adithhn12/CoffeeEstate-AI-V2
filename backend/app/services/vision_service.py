@@ -146,11 +146,6 @@ class VisionService:
         """
         Runs object detection on the provided image, calculates class counts and percentages,
         classifies maturity stage, and generates an annotated image with bounding boxes.
-
-        Phase 4 Denominator Structure:
-          - Total Detections: total_cherries = red + yellow + green + dark_brown + low_visibility_unsure
-          - Evaluable Cherries: evaluable_cherries = red + yellow + green + dark_brown (excluding low_visibility_unsure)
-          - Uncertain Cherries: low_visibility_unsure (reported separately as uncertainty ratio)
         """
         if not image_path.exists():
             raise FileNotFoundError(f"Image not found at {image_path}")
@@ -158,6 +153,32 @@ class VisionService:
         img_bgr = cv2.imread(str(image_path))
         if img_bgr is None:
             raise ValueError(f"Could not decode image at {image_path}. File may be corrupted or invalid format.")
+
+        # ==========================================
+        # DIGITAL SLIDE / DARK PRESENTATION SCREEN GUARD
+        # ==========================================
+        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+        mean_brightness = np.mean(gray)
+        if mean_brightness < 45:
+            raise ValueError(
+                "Invalid image: This appears to be a digital presentation slide or dark screenshot, "
+                "not a photograph of coffee cherries."
+            )
+        # ==========================================
+
+        # ==========================================
+        # PLANT / LEAF FOLIAGE COLOR CHECK (Blocks People & Indoor Photos)
+        # ==========================================
+        hsv_check = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
+        leaf_mask = cv2.inRange(hsv_check, np.array([35, 40, 40]), np.array([85, 255, 255]))
+        leaf_pixel_ratio = np.count_nonzero(leaf_mask) / leaf_mask.size
+
+        if leaf_pixel_ratio < 0.08:
+            raise ValueError(
+                "Invalid image: No coffee leaves or plant canopy detected. "
+                "Please upload a proper close-up photograph of a coffee branch with leaves and cherries."
+            )
+        # ==========================================
 
         height, width = img_bgr.shape[:2]
         t0 = time.time()
@@ -175,10 +196,12 @@ class VisionService:
                 pass
 
         if has_custom_yolo:
-            # Run fine-tuned YOLO inference with tuned IOU and max_det
+            # Enforce a higher confidence threshold (at least 0.65) to eliminate weak false positives on slides/posters
+            effective_conf = max(confidence_threshold, 0.65)
+
             results = self.model.predict(
                 source=str(image_path),
-                conf=confidence_threshold,
+                conf=effective_conf,
                 iou=settings.IOU_THRESHOLD,
                 max_det=settings.MAX_DETECTIONS,
                 verbose=False
@@ -209,15 +232,25 @@ class VisionService:
             # CV-Heuristic fallback for preliminary mode
             detections, counts = self._detect_cherries_heuristic(img_bgr, confidence_threshold)
 
-        elapsed_ms = round((time.time() - t0) * 1000, 2)
+        # ==========================================
+        # STRICT IMAGE CONTENT VALIDATION GUARD
+        # ==========================================
         total_detected = sum(counts.values())
+        evaluable_check = counts[0] + counts[1] + counts[3] + counts[4]
+        mean_conf_check = float(np.mean([d["confidence"] for d in detections])) if detections else 0.0
+
+        if total_detected < 8 or evaluable_check == 0 or mean_conf_check < 0.55:
+            raise ValueError(
+                "Invalid image: This does not look like a correct image of coffee cherries. "
+                "Please upload a clear close-up photograph of a coffee branch with visible cherries."
+            )
+        # ==========================================
+
+        elapsed_ms = round((time.time() - t0) * 1000, 2)
         
-        # Phase 4: Distinct denominators
-        # Evaluable cherries (discernible biological ripeness)
-        evaluable_cherries = counts[0] + counts[1] + counts[3] + counts[4]
+        evaluable_cherries = evaluable_check
         uncertain_cherries = counts[2]
 
-        # 1. Percentages out of total detections (including low_visibility_unsure)
         if total_detected > 0:
             red_pct = round((counts[3] / total_detected) * 100, 2)
             yellow_pct = round((counts[4] / total_detected) * 100, 2)
@@ -228,7 +261,6 @@ class VisionService:
         else:
             red_pct = yellow_pct = green_pct = dark_brown_pct = low_vis_pct = uncertain_pct = 0.0
 
-        # 2. Percentages out of evaluable cherries (discernible ripeness denominator)
         if evaluable_cherries > 0:
             evaluable_red_pct = round((counts[3] / evaluable_cherries) * 100, 2)
             evaluable_yellow_pct = round((counts[4] / evaluable_cherries) * 100, 2)
@@ -237,9 +269,8 @@ class VisionService:
         else:
             evaluable_red_pct = evaluable_yellow_pct = evaluable_green_pct = evaluable_dark_brown_pct = 0.0
 
-        mean_conf = round(float(np.mean([d["confidence"] for d in detections])), 4) if detections else 0.0
+        mean_conf = round(mean_conf_check, 4)
 
-        # Classify maturity stage using evaluable distribution and variety context
         maturity_stage, maturity_notes = self._interpret_maturity(
             red_pct=red_pct,
             yellow_pct=yellow_pct,
@@ -255,7 +286,6 @@ class VisionService:
             variety=variety
         )
 
-        # Generate annotated image
         annotated_path = None
         if save_annotated and len(detections) > 0:
             annotated_img = img_bgr.copy()
@@ -274,7 +304,6 @@ class VisionService:
                 color_bgr = CLASS_COLORS.get(cid, {}).get("bgr", (0, 255, 0))
                 cv2.rectangle(annotated_img, (x1, y1), (x2, y2), color_bgr, 2)
                 
-                # Label tag
                 label = f"{CLASS_COLORS[cid]['name'].replace('_cherry', '')} {int(det['confidence']*100)}%"
                 font_scale = 0.4
                 font_thickness = 1
@@ -298,13 +327,11 @@ class VisionService:
             "low_visibility_count": counts[2],
             "red_count": counts[3],
             "yellow_count": counts[4],
-            # Denominator 1 (Total Detections)
             "dark_brown_pct": dark_brown_pct,
             "green_pct": green_pct,
             "low_visibility_pct": low_vis_pct,
             "red_pct": red_pct,
             "yellow_pct": yellow_pct,
-            # Denominator 2 (Evaluable Cherries)
             "evaluable_cherries": evaluable_cherries,
             "evaluable_red_pct": evaluable_red_pct,
             "evaluable_yellow_pct": evaluable_yellow_pct,
@@ -342,11 +369,6 @@ class VisionService:
         total_cherries: int,
         variety: str = "Arabica (Selection 795)"
     ) -> Tuple[str, str]:
-        """
-        Interprets detected cherry distributions into actionable harvesting advice.
-        Uses evaluable_cherries (excluding low_visibility_unsure) to determine ripeness,
-        and factors in specific Coorg cultivars and high-uncertainty warnings.
-        """
         if total_cherries == 0:
             return "No Cherries Detected", "No coffee cherries recognized. Verify camera focus and lighting."
 
@@ -357,7 +379,6 @@ class VisionService:
                 "Unable to assess maturity. Please recapture branch photo under diffused daylight."
             )
 
-        # Cultivar-specific adjustments
         variety_lower = variety.lower()
         uncertainty_warning = ""
         if low_vis_pct > 30.0:
@@ -366,7 +387,6 @@ class VisionService:
                 "Resample branch under diffused sunlight for higher precision.]"
             )
 
-        # Specialty Yellow Bourbon: yellow cherries indicate peak ripeness
         if "yellow bourbon" in variety_lower:
             if evaluable_yellow_pct >= 55.0:
                 return (
@@ -375,7 +395,6 @@ class VisionService:
                     "In Yellow Bourbon cultivars, yellow signifies peak Brix ripeness.{uncertainty_warning}"
                 )
 
-        # Standard Robusta / Arabica cultivars
         if evaluable_dark_brown_pct > 25.0:
             return (
                 "Overripe / Dried Risk",
@@ -410,10 +429,6 @@ class VisionService:
             )
 
     def _detect_cherries_heuristic(self, img_bgr: np.ndarray, conf_thresh: float) -> Tuple[List[Dict[str, Any]], Dict[int, int]]:
-        """
-        Graceful computer vision fallback using color segmentation & circular contour detection
-        when custom deep model weights are not yet loaded or initialized.
-        """
         height, width = img_bgr.shape[:2]
         hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
 
