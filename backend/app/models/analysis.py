@@ -17,6 +17,7 @@ class ImageAnalysis(Base):
     # Metadata
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime, default=datetime.utcnow)
+    analysis_mode = Column(String(50), default="branch")  # 'branch' or 'whole_plant'
     model_version = Column(String(100), default="YOLOv8s-Croppie-v1.0")
     model_status_at_inference = Column(String(100), default="Trained on public dataset")
     inference_time_ms = Column(Float, default=0.0)

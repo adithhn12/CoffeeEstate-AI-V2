@@ -30,12 +30,18 @@ export const api = {
   getModelStatus: () => fetchJson<ModelStatusInfo>(`${API_BASE}/analysis/model-status`),
 
   // Ripeness Analysis & CV
-  uploadAndAnalyze: (sectionId: number | null, files: File[], confidence = 0.25) => {
+  uploadAndAnalyze: (
+    sectionId: number | null,
+    files: File[],
+    confidence = 0.25,
+    mode: 'branch' | 'whole_plant' = 'branch'
+  ) => {
     const formData = new FormData();
     if (sectionId !== null && sectionId !== undefined) {
       formData.append('section_id', sectionId.toString());
     }
     formData.append('confidence_threshold', confidence.toString());
+    formData.append('analysis_mode', mode);
     files.forEach((f) => formData.append('files', f));
 
     return fetchJson<BatchAnalysisResponse>(`${API_BASE}/analysis/upload`, {

@@ -98,6 +98,66 @@ class TestCoffeeEstateBackend(unittest.TestCase):
         self.assertEqual(del_res.status_code, 200)
         self.assertEqual(del_res.json()["message"], "Analysis deleted successfully")
 
+    def test_07_whole_plant_mode_and_tile_duplicate_reconciliation(self):
+        """Verifies that whole-plant mode processes tiled patches, reconciles duplicates, and suppresses bounding boxes."""
+        test_img = Path("datasets/croppie_coffee/extracted/val/images/1687438155343.jpg")
+        self.assertTrue(test_img.exists(), "Sample test image must exist")
+
+        with open(test_img, "rb") as f:
+            res = self.client.post(
+                "/api/analysis/upload",
+                data={"confidence_threshold": 0.25, "analysis_mode": "whole_plant"},
+                files={"files": ("canopy_test.jpg", f, "image/jpeg")}
+            )
+
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["analysis_mode"], "whole_plant")
+        self.assertIn("plant_ripeness_score", data)
+        self.assertGreaterEqual(data["plant_ripeness_score"], 0)
+        self.assertLessEqual(data["plant_ripeness_score"], 100)
+
+        # Whole plant mode must suppress bounding boxes and not produce annotated box overlay
+        item = data["individual_results"][0]
+        self.assertIsNone(item["annotated_storage_path"], "Whole plant mode must NOT produce an annotated bounding box image")
+        self.assertEqual(len(item["detections"]), 0, "Whole plant mode must NOT return individual bounding box clutter")
+        self.assertGreaterEqual(item["total_cherries"], 10)
+        self.assertGreaterEqual(item["tiles_processed"], 1)
+        self.assertIsNotNone(item["quality_assessment"])
+
+    def test_08_reconcile_tile_duplicates_direct(self):
+        """Verifies that duplicate bounding boxes across overlapping tiles are reconciled via NMS."""
+        # Create two overlapping boxes of same class (3: red_cherry)
+        boxes = [
+            [100.0, 100.0, 150.0, 150.0, 0.85, 3],
+            [102.0, 101.0, 151.0, 152.0, 0.72, 3],  # Overlap IoU ~ 0.90 with box 0 -> should be suppressed
+            [300.0, 300.0, 350.0, 350.0, 0.91, 1],  # Non-overlapping green cherry -> must be kept
+        ]
+        reconciled = vision_service._reconcile_tile_duplicates(boxes, width=640, height=640, iou_threshold=0.45)
+        self.assertEqual(len(reconciled), 2, "Duplicate overlapping box must be suppressed by NMS")
+        # Ensure highest confidence box was retained
+        confs = [b[4] for b in reconciled]
+        self.assertIn(0.85, confs)
+        self.assertIn(0.91, confs)
+        self.assertNotIn(0.72, confs)
+
+    def test_09_whole_plant_insufficient_visual_detail_rejection(self):
+        """Verifies that an image with insufficient visual detail in whole plant mode returns 400 Bad Request."""
+        import cv2
+        import numpy as np
+        # Create a plain blank green square without cherries
+        blank_img = np.full((640, 640, 3), (40, 120, 40), dtype=np.uint8)
+        _, enc = cv2.imencode(".jpg", blank_img)
+        blank_bytes = enc.tobytes()
+
+        res = self.client.post(
+            "/api/analysis/upload",
+            data={"confidence_threshold": 0.25, "analysis_mode": "whole_plant"},
+            files={"files": ("blank_plant.jpg", blank_bytes, "image/jpeg")}
+        )
+        self.assertEqual(res.status_code, 400)
+        self.assertIn("Insufficient visual detail", res.json()["detail"])
+
 if __name__ == "__main__":
     suite = unittest.TestLoader().loadTestsFromTestCase(TestCoffeeEstateBackend)
     runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=2)

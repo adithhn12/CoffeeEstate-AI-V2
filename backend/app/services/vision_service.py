@@ -141,11 +141,13 @@ class VisionService:
         image_path: Path,
         confidence_threshold: float = 0.25,
         save_annotated: bool = True,
-        variety: str = "Arabica (Selection 795)"
+        variety: str = "Arabica (Selection 795)",
+        mode: str = "branch"
     ) -> Dict[str, Any]:
         """
-        Runs object detection on the provided image, calculates class counts and percentages,
-        classifies maturity stage, and generates an annotated image with bounding boxes.
+        Runs cherry analysis on the provided image:
+        - mode='branch': Standard close-up branch inference with individual bounding box annotations.
+        - mode='whole_plant': High-resolution tiled canopy inference across the visible plant without bounding boxes.
         """
         if not image_path.exists():
             raise FileNotFoundError(f"Image not found at {image_path}")
@@ -154,9 +156,7 @@ class VisionService:
         if img_bgr is None:
             raise ValueError(f"Could not decode image at {image_path}. File may be corrupted or invalid format.")
 
-        # ==========================================
-        # DIGITAL SLIDE / DARK PRESENTATION SCREEN GUARD
-        # ==========================================
+        # Digital slide / dark screen guard
         gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
         mean_brightness = np.mean(gray)
         if mean_brightness < 45:
@@ -164,22 +164,18 @@ class VisionService:
                 "Invalid image: This appears to be a digital presentation slide or dark screenshot, "
                 "not a photograph of coffee cherries."
             )
-        # ==========================================
 
-        # ==========================================
-        # PLANT / LEAF FOLIAGE COLOR CHECK (Blocks People & Indoor Photos)
-        # ==========================================
-        hsv_check = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
-        leaf_mask = cv2.inRange(hsv_check, np.array([35, 40, 40]), np.array([85, 255, 255]))
-        leaf_pixel_ratio = np.count_nonzero(leaf_mask) / leaf_mask.size
-
-        if leaf_pixel_ratio < 0.08:
-            raise ValueError(
-                "Invalid image: No coffee leaves or plant canopy detected. "
-                "Please upload a proper close-up photograph of a coffee branch with leaves and cherries."
+        if mode == "whole_plant":
+            return self._analyze_whole_plant(
+                img_bgr=img_bgr,
+                image_path=image_path,
+                confidence_threshold=confidence_threshold,
+                variety=variety
             )
-        # ==========================================
 
+        # ==========================================
+        # BRANCH-LEVEL CLOSE-UP INFERENCE (DEFAULT)
+        # ==========================================
         height, width = img_bgr.shape[:2]
         t0 = time.time()
 
@@ -196,12 +192,9 @@ class VisionService:
                 pass
 
         if has_custom_yolo:
-            # Enforce a higher confidence threshold (at least 0.65) to eliminate weak false positives on slides/posters
-            effective_conf = max(confidence_threshold, 0.65)
-
             results = self.model.predict(
                 source=str(image_path),
-                conf=effective_conf,
+                conf=confidence_threshold,
                 iou=settings.IOU_THRESHOLD,
                 max_det=settings.MAX_DETECTIONS,
                 verbose=False
@@ -321,6 +314,7 @@ class VisionService:
             "model_status_at_inference": self.model_status,
             "inference_time_ms": elapsed_ms,
             "confidence_threshold": confidence_threshold,
+            "analysis_mode": "branch",
             "total_cherries": total_detected,
             "dark_brown_count": counts[0],
             "green_count": counts[1],
@@ -344,6 +338,9 @@ class VisionService:
             "maturity_notes": maturity_notes,
             "detections": detections,
             "annotated_storage_path": annotated_path,
+            "plant_ripeness_score": min(100, round((evaluable_red_pct * 1.0) + (evaluable_yellow_pct * 0.45))),
+            "tiles_processed": 1,
+            "quality_assessment": "High (Close-up Branch Analysis)",
             "denominator_note": (
                 "Percentages breakdown: visual shares (red_pct, etc.) use total_cherries denominator. "
                 "Derived maturity shares use evaluable_cherries denominator (excluding low_visibility_unsure)."
@@ -353,6 +350,377 @@ class VisionService:
                 "They indicate sampling density and maturity distribution, not total plantation yield per acre."
             )
         }
+
+    def _analyze_whole_plant(
+        self,
+        img_bgr: np.ndarray,
+        image_path: Path,
+        confidence_threshold: float = 0.20,
+        variety: str = "Arabica (Selection 795)"
+    ) -> Dict[str, Any]:
+        """
+        Whole-Plant / Canopy Analysis using high-resolution tiled YOLO inference.
+        Divides high-resolution canopy photos into overlapping 640x640 patches,
+        reconciles duplicate detections via Non-Maximum Suppression (NMS),
+        estimates whole-bush ripeness distribution, and suppresses bounding boxes.
+        """
+        orig_h, orig_w = img_bgr.shape[:2]
+        t0 = time.time()
+
+        # Step 1: Safe Resolution Handling
+        # If image exceeds 2560px on either side, downscale smoothly to prevent GPU OOM
+        max_dim = max(orig_h, orig_w)
+        if max_dim > 2560:
+            scale = 2560.0 / max_dim
+            proc_w = int(orig_w * scale)
+            proc_h = int(orig_h * scale)
+            proc_img = cv2.resize(img_bgr, (proc_w, proc_h), interpolation=cv2.INTER_AREA)
+        else:
+            scale = 1.0
+            proc_w, proc_h = orig_w, orig_h
+            proc_img = img_bgr
+
+        # Step 2: High-Resolution Tiling (640x640 with 128px overlap)
+        tile_size = 640
+        stride = 512
+
+        if proc_w <= tile_size and proc_h <= tile_size:
+            padded = np.zeros((tile_size, tile_size, 3), dtype=np.uint8)
+            padded[:proc_h, :proc_w] = proc_img
+            tiles = [(0, 0, padded)]
+        else:
+            xs = list(range(0, max(1, proc_w - tile_size + 1), stride))
+            if xs[-1] != max(0, proc_w - tile_size):
+                xs.append(max(0, proc_w - tile_size))
+            xs = sorted(list(set(xs)))
+
+            ys = list(range(0, max(1, proc_h - tile_size + 1), stride))
+            if ys[-1] != max(0, proc_h - tile_size):
+                ys.append(max(0, proc_h - tile_size))
+            ys = sorted(list(set(ys)))
+
+            tiles = []
+            for y in ys:
+                for x in xs:
+                    x_end = min(proc_w, x + tile_size)
+                    y_end = min(proc_h, y + tile_size)
+                    crop = proc_img[y:y_end, x:x_end]
+                    if crop.shape[0] < tile_size or crop.shape[1] < tile_size:
+                        padded = np.zeros((tile_size, tile_size, 3), dtype=np.uint8)
+                        padded[:crop.shape[0], :crop.shape[1]] = crop
+                        tiles.append((x, y, padded))
+                    else:
+                        tiles.append((x, y, crop))
+
+        # Step 3: Batched YOLO Inference across Tiles
+        all_boxes = []  # [x1, y1, x2, y2, conf, cls_id]
+        batch_size = 8
+
+        has_custom_yolo = (
+            self.model is not None 
+            and hasattr(self.model, "names") 
+            and len(self.model.names) == 5 
+            and "red_cherry" in str(self.model.names)
+        )
+
+        if has_custom_yolo:
+            for i in range(0, len(tiles), batch_size):
+                batch_subset = tiles[i:i + batch_size]
+                batch_imgs = [t[2] for t in batch_subset]
+
+                results = self.model.predict(
+                    source=batch_imgs,
+                    conf=max(0.15, confidence_threshold * 0.8),
+                    iou=0.50,
+                    max_det=300,
+                    verbose=False
+                )
+
+                for (x_offset, y_offset, _), res in zip(batch_subset, results):
+                    if res.boxes is not None and len(res.boxes) > 0:
+                        for box in res.boxes:
+                            cls_id = int(box.cls[0].item())
+                            conf = float(box.conf[0].item())
+                            b_xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+
+                            gx1 = b_xyxy[0] + x_offset
+                            gy1 = b_xyxy[1] + y_offset
+                            gx2 = b_xyxy[2] + x_offset
+                            gy2 = b_xyxy[3] + y_offset
+
+                            gx1 = max(0.0, min(float(proc_w), gx1))
+                            gy1 = max(0.0, min(float(proc_h), gy1))
+                            gx2 = max(0.0, min(float(proc_w), gx2))
+                            gy2 = max(0.0, min(float(proc_h), gy2))
+
+                            if (gx2 - gx1) > 2 and (gy2 - gy1) > 2:
+                                all_boxes.append([gx1, gy1, gx2, gy2, conf, cls_id])
+        else:
+            for x_offset, y_offset, tile_img in tiles:
+                dets, _ = self._detect_cherries_heuristic(tile_img, confidence_threshold)
+                for d in dets:
+                    coords = d.get("pixel_coords", [0, 0, 0, 0])
+                    all_boxes.append([
+                        coords[0] + x_offset,
+                        coords[1] + y_offset,
+                        coords[2] + x_offset,
+                        coords[3] + y_offset,
+                        d["confidence"],
+                        d["class_id"]
+                    ])
+
+        # Step 4: Duplicate Reconciliation via Non-Maximum Suppression (NMS)
+        reconciled_boxes = self._reconcile_tile_duplicates(all_boxes, proc_w, proc_h)
+
+        # Step 5: Mode-Aware Validation Guards
+        total_detected = len(reconciled_boxes)
+        counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+        for b in reconciled_boxes:
+            cid = int(b[5])
+            if cid in counts:
+                counts[cid] += 1
+
+        evaluable_count = counts[0] + counts[1] + counts[3] + counts[4]
+        mean_conf = float(np.mean([b[4] for b in reconciled_boxes])) if reconciled_boxes else 0.0
+
+        if total_detected < 8 or evaluable_count == 0:
+            raise ValueError(
+                "Insufficient visual detail: Unable to detect sufficient coffee cherries on this plant. "
+                "Please upload a clearer photograph captured from 1.5–2.5 meters away with visible fruit clusters."
+            )
+
+        # Foliage context check (HSV green/earthy presence)
+        hsv = cv2.cvtColor(proc_img, cv2.COLOR_BGR2HSV)
+        canopy_mask = cv2.inRange(hsv, np.array([20, 20, 20]), np.array([100, 255, 255]))
+        canopy_coverage = float(np.count_nonzero(canopy_mask)) / (proc_w * proc_h)
+        if canopy_coverage < 0.08 and total_detected < 20:
+            raise ValueError(
+                "Invalid image: The uploaded photograph does not appear to show a coffee plant canopy or foliage."
+            )
+
+        elapsed_ms = round((time.time() - t0) * 1000, 2)
+
+        # Step 6: Percentage Breakdown
+        evaluable_cherries = evaluable_count
+        uncertain_cherries = counts[2]
+
+        red_pct = round((counts[3] / total_detected) * 100, 1)
+        yellow_pct = round((counts[4] / total_detected) * 100, 1)
+        green_pct = round((counts[1] / total_detected) * 100, 1)
+        dark_brown_pct = round((counts[0] / total_detected) * 100, 1)
+        low_vis_pct = round((counts[2] / total_detected) * 100, 1)
+
+        evaluable_red_pct = round((counts[3] / evaluable_cherries) * 100, 1) if evaluable_cherries > 0 else 0.0
+        evaluable_yellow_pct = round((counts[4] / evaluable_cherries) * 100, 1) if evaluable_cherries > 0 else 0.0
+        evaluable_green_pct = round((counts[1] / evaluable_cherries) * 100, 1) if evaluable_cherries > 0 else 0.0
+        evaluable_dark_brown_pct = round((counts[0] / evaluable_cherries) * 100, 1) if evaluable_cherries > 0 else 0.0
+
+        plant_ripeness_score = min(100, round((evaluable_red_pct * 1.0) + (evaluable_yellow_pct * 0.45)))
+
+        if total_detected >= 50 and mean_conf >= 0.45:
+            quality_assessment = "High Sampling Confidence (Dense Fruit Sampling Across Canopy)"
+        elif total_detected >= 25:
+            quality_assessment = "Moderate Sampling Confidence (Medium Cluster Density)"
+        else:
+            quality_assessment = "Lower Confidence (Sparse / Partially Shaded Clusters)"
+
+        maturity_stage, maturity_notes = self._interpret_whole_plant_maturity(
+            evaluable_red_pct=evaluable_red_pct,
+            evaluable_yellow_pct=evaluable_yellow_pct,
+            evaluable_green_pct=evaluable_green_pct,
+            evaluable_dark_brown_pct=evaluable_dark_brown_pct,
+            evaluable_cherries=evaluable_cherries,
+            total_cherries=total_detected,
+            variety=variety
+        )
+
+        return {
+            "model_version": self.model_version,
+            "model_status_at_inference": self.model_status,
+            "inference_time_ms": elapsed_ms,
+            "confidence_threshold": confidence_threshold,
+            "analysis_mode": "whole_plant",
+            "total_cherries": total_detected,
+            "dark_brown_count": counts[0],
+            "green_count": counts[1],
+            "low_visibility_count": counts[2],
+            "red_count": counts[3],
+            "yellow_count": counts[4],
+            "dark_brown_pct": dark_brown_pct,
+            "green_pct": green_pct,
+            "low_visibility_pct": low_vis_pct,
+            "red_pct": red_pct,
+            "yellow_pct": yellow_pct,
+            "evaluable_cherries": evaluable_cherries,
+            "evaluable_red_pct": evaluable_red_pct,
+            "evaluable_yellow_pct": evaluable_yellow_pct,
+            "evaluable_green_pct": evaluable_green_pct,
+            "evaluable_dark_brown_pct": evaluable_dark_brown_pct,
+            "uncertain_cherries": uncertain_cherries,
+            "uncertain_pct": low_vis_pct,
+            "mean_confidence": round(mean_conf, 4),
+            "maturity_stage": maturity_stage,
+            "maturity_notes": maturity_notes,
+            "detections": [],  # Clean image: individual bounding boxes suppressed
+            "annotated_storage_path": None,  # Original photo displayed cleanly
+            "plant_ripeness_score": plant_ripeness_score,
+            "tiles_processed": len(tiles),
+            "quality_assessment": quality_assessment,
+            "denominator_note": (
+                "Whole-Plant Distribution: Ripeness percentages reflect collective fruit maturity across visible foliage. "
+                "Derived maturity shares use evaluable cherries (excluding occluded fruit)."
+            ),
+            "yield_disclaimer": (
+                "WHOLE-CANOPY SAMPLING NOTICE: Percentages represent visible canopy clusters. "
+                "Interior cherries obscured by dense foliage are not included in surface optical estimation."
+            )
+        }
+
+    def _reconcile_tile_duplicates(
+        self,
+        boxes: List[List[float]],
+        width: int,
+        height: int,
+        iou_threshold: float = 0.45
+    ) -> List[List[float]]:
+        if not boxes:
+            return []
+
+        try:
+            import torch
+            import torchvision.ops
+
+            b_t = torch.tensor([[b[0], b[1], b[2], b[3]] for b in boxes], dtype=torch.float32)
+            s_t = torch.tensor([b[4] for b in boxes], dtype=torch.float32)
+            c_t = torch.tensor([b[5] for b in boxes], dtype=torch.float32)
+
+            max_coord = float(max(width, height) + 1000)
+            shifted = b_t + c_t.unsqueeze(1) * max_coord
+            keep = torchvision.ops.nms(shifted, s_t, iou_threshold=iou_threshold)
+            return [boxes[i] for i in keep.tolist()]
+        except Exception:
+            boxes_arr = np.array(boxes)
+            x1 = boxes_arr[:, 0]
+            y1 = boxes_arr[:, 1]
+            x2 = boxes_arr[:, 2]
+            y2 = boxes_arr[:, 3]
+            scores = boxes_arr[:, 4]
+            classes = boxes_arr[:, 5]
+
+            areas = (x2 - x1) * (y2 - y1)
+            order = scores.argsort()[::-1]
+
+            keep = []
+            while order.size > 0:
+                i = order[0]
+                keep.append(i)
+                if order.size == 1:
+                    break
+
+                xx1 = np.maximum(x1[i], x1[order[1:]])
+                yy1 = np.maximum(y1[i], y1[order[1:]])
+                xx2 = np.minimum(x2[i], x2[order[1:]])
+                yy2 = np.minimum(y2[i], y2[order[1:]])
+
+                w = np.maximum(0.0, xx2 - xx1)
+                h = np.maximum(0.0, yy2 - yy1)
+                inter = w * h
+                ovr = inter / (areas[i] + areas[order[1:]] - inter)
+
+                same_cls = (classes[order[1:]] == classes[i])
+                suppress = np.where(same_cls & (ovr > iou_threshold))[0]
+                order = np.delete(order, np.concatenate(([0], suppress + 1)))
+
+            return [boxes[k] for k in keep]
+
+    def _interpret_whole_plant_maturity(
+        self,
+        evaluable_red_pct: float,
+        evaluable_yellow_pct: float,
+        evaluable_green_pct: float,
+        evaluable_dark_brown_pct: float,
+        evaluable_cherries: int,
+        total_cherries: int,
+        variety: str = "Arabica (Selection 795)"
+    ) -> Tuple[str, str]:
+        variety_lower = variety.lower()
+
+        if total_cherries == 0 or evaluable_cherries == 0:
+            return (
+                "Insufficient Fruit Sampling",
+                "No discernible ripe, turning, or green cherries detected across the visible plant foliage. "
+                "Recapture in diffused lighting with the camera positioned 1.5–2 meters from the coffee canopy."
+            )
+
+        estate_prep = "washed Arabica (Plantation Grade A)" if "arabica" in variety_lower else "premium natural Robusta"
+
+        # Tier 1: Significant Overripe Percentage -> Prioritise Overripe Cherry Picking
+        if evaluable_dark_brown_pct >= 15.0:
+            return (
+                "Overripe Canopy Alert — Prioritise Overripe Picking",
+                f"Plant-wide analysis shows {evaluable_dark_brown_pct:.1f}% overripe or dried cherries across the canopy. "
+                "Prioritise immediate selective picking of overripe cherries and sanitation plucking across this section "
+                "to suppress coffee berry borer (Hypothenemus hampei) colonization and avoid fungal souring. "
+                "Float harvested cherries in water tanks to separate dried/damaged fruit before processing.\n"
+                "[Ripeness-based estimate: Immediate sanitation picking recommended; actual fruit degradation rate depends on ambient humidity and sun exposure.]"
+            )
+
+        # Cultivar check for Yellow Bourbon
+        if "yellow bourbon" in variety_lower:
+            if evaluable_yellow_pct >= 70.0 and evaluable_green_pct <= 18.0:
+                return (
+                    "Optimal Whole-Plant Harvest Ready (Yellow Bourbon)",
+                    f"Canopy displays uniform golden maturity with {evaluable_yellow_pct:.1f}% yellow cherries and minimal unripe green fruit ({evaluable_green_pct:.1f}%). "
+                    "In Yellow Bourbon cultivars, uniform golden coloration indicates peak Brix sugar development. Broad harvesting readiness: bush is ready for full canopy picking.\n"
+                    "[Ripeness-based estimate: Optimal broad harvesting window is estimated within the next 3–6 days based on visual ripeness; actual timeline will vary with local weather and temperature.]"
+                )
+            elif (evaluable_yellow_pct >= 35.0 or (evaluable_yellow_pct + evaluable_red_pct >= 50.0)) and evaluable_green_pct > 18.0:
+                return (
+                    "Selective Harvesting Advised (Yellow Bourbon)",
+                    f"Plant canopy exhibits mixed maturation with {evaluable_yellow_pct:.1f}% ripe yellow cherries alongside {evaluable_green_pct:.1f}% unripe green cherries. "
+                    "Do not perform whole-plant strip plucking, as stripping immature green cherries will cause astringent cup defects and reduce estate grade. "
+                    "Selective hand-picking is advised: harvest only ripe golden cherries while leaving unripe green fruit on the bush to continue ripening.\n"
+                    "[Ripeness-based estimate: Conduct a selective picking pass now; reassess remaining green fruit in 10–14 days based on visual progress, subject to local weather conditions.]"
+                )
+
+        # Tier 2: High Ripe Percentage with Very Few Unripe Cherries -> Broad Harvesting Readiness
+        if evaluable_red_pct >= 70.0 and evaluable_green_pct <= 18.0:
+            return (
+                "Optimal Whole-Plant Harvest Ready (Broad Harvesting)",
+                f"Canopy has reached uniform maturity with {evaluable_red_pct:.1f}% ripe red cherries and very low unripe fruit ({evaluable_green_pct:.1f}%). "
+                f"Broad harvesting readiness: bush is ready for full canopy picking. Prime window for {estate_prep}. "
+                "Depulp harvested cherries within 6 to 8 hours to maintain specialty washed parchment quality.\n"
+                "[Ripeness-based estimate: Optimal broad harvesting window is estimated within the next 3–6 days based on visual maturity; actual timeline will vary with local temperature and rainfall.]"
+            )
+
+        # Tier 3: Moderate Ripe Percentage with Significant Unripe Cherries -> Selective Harvesting
+        # (Specifically handles mixed maturation such as 55.9% ripe and 42.1% unripe)
+        if (evaluable_red_pct >= 35.0 or (evaluable_red_pct + evaluable_yellow_pct >= 50.0)) and evaluable_green_pct > 18.0:
+            return (
+                "Selective Harvesting Advised (Moderate Ripe, High Unripe)",
+                f"Plant canopy exhibits staggered ripening with {evaluable_red_pct:.1f}% ripe red cherries alongside a significant proportion of immature green cherries ({evaluable_green_pct:.1f}%). "
+                "Do not perform broad or whole-plant strip plucking, as stripping immature green cherries will cause astringent cup defects and reduce estate grade. "
+                "Selective hand-picking is strongly recommended: harvest only mature crimson cherries from exposed branches while leaving green clusters on the bush to continue ripening.\n"
+                "[Ripeness-based estimate: Conduct a selective picking pass now; reassess remaining green fruit in 10–14 days based on visual progress, subject to local weather conditions.]"
+            )
+
+        # Tier 4: Low Ripe Percentage -> Wait and Reassess
+        if evaluable_green_pct >= 50.0 or (evaluable_red_pct < 35.0 and evaluable_red_pct + evaluable_yellow_pct < 45.0):
+            return (
+                "Immature Canopy — Wait and Reassess",
+                f"Canopy is predominantly immature ({evaluable_green_pct:.1f}% green cherries, only {evaluable_red_pct:.1f}% ripe red). "
+                "Immature cherries have not developed sufficient mucilage sugars or Brix content. Hold harvesting operations to prevent astringent, sour liquor. "
+                "Allow clusters to mature on the plant.\n"
+                "[Ripeness-based estimate: Defer harvest and reassess canopy in 2 to 4 weeks; maturation timing will depend on rainfall patterns and sunlight exposure.]"
+            )
+
+        # Fallback: Turning Phase / Mixed Maturation
+        return (
+            "Turning Phase — Selective Monitoring",
+            f"Canopy is in an active turning phase ({evaluable_red_pct:.1f}% red, {evaluable_yellow_pct:.1f}% semi-ripe yellow, {evaluable_green_pct:.1f}% green). "
+            "Staggered flowering flushes detected. Selective fly-picking of early ripe cherries may be performed on sun-exposed branches, while deferring the primary harvest.\n"
+            "[Ripeness-based estimate: Monitor canopy development over the next 7–10 days; estimate is based on visual ripeness without microclimate integration.]"
+        )
 
     def _interpret_maturity(
         self,

@@ -17,6 +17,7 @@ class ImageAnalysisResponse(BaseModel):
     annotated_storage_path: Optional[str] = None
     uploaded_at: datetime
     analyzed_at: datetime
+    analysis_mode: str = "branch"
     model_version: str
     model_status_at_inference: str
     inference_time_ms: float
@@ -51,6 +52,9 @@ class ImageAnalysisResponse(BaseModel):
     mean_confidence: Optional[float] = None
     denominator_note: Optional[str] = None
     yield_disclaimer: Optional[str] = None
+    plant_ripeness_score: Optional[int] = None
+    tiles_processed: Optional[int] = None
+    quality_assessment: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -58,6 +62,7 @@ class ImageAnalysisResponse(BaseModel):
 class BatchAnalysisResponse(BaseModel):
     section_id: Optional[int] = None
     section_name: Optional[str] = None
+    analysis_mode: str = "branch"
     total_images_analyzed: int
     aggregated_total_cherries: int
     avg_red_pct: float
@@ -77,6 +82,7 @@ class BatchAnalysisResponse(BaseModel):
     avg_evaluable_dark_brown_pct: Optional[float] = None
     avg_uncertain_pct: Optional[float] = None
     photographic_yield_disclaimer: Optional[str] = None
+    plant_ripeness_score: Optional[int] = None
 
 class ModelStatusResponse(BaseModel):
     model_name: str

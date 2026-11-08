@@ -32,12 +32,13 @@ def get_model_status():
 async def upload_and_analyze_cherries(
     section_id: Optional[int] = Form(default=None),
     confidence_threshold: float = Form(default=0.25),
+    analysis_mode: str = Form(default="branch"),
     files: List[UploadFile] = File(...),
     db: Session = Depends(get_db)
 ):
     """
     Accepts one or more coffee cherry photos, verifies image validity,
-    runs the YOLO cherry detection pipeline, annotates bounding boxes,
+    runs the YOLO cherry detection pipeline (Branch close-up or Whole-Plant canopy),
     calculates class counts, ripeness percentages, maturity stage,
     and persists results to SQLite.
     """
@@ -97,18 +98,19 @@ async def upload_and_analyze_cherries(
             analysis_dict = vision_service.analyze_image(
                 image_path=raw_path,
                 confidence_threshold=confidence_threshold,
-                save_annotated=True,
-                variety=inferred_variety
+                save_annotated=(analysis_mode == "branch"),
+                variety=inferred_variety,
+                mode=analysis_mode
             )
             
-            # Additional direct validation check inside the route loop
+            # Additional direct validation check inside the route loop for branch mode
             evaluable_count = (
                 analysis_dict.get("red_count", 0) +
                 analysis_dict.get("yellow_count", 0) +
                 analysis_dict.get("green_count", 0) +
                 analysis_dict.get("dark_brown_count", 0)
             )
-            if analysis_dict.get("total_cherries", 0) < 3 or evaluable_count == 0:
+            if analysis_mode == "branch" and (analysis_dict.get("total_cherries", 0) < 3 or evaluable_count == 0):
                 raise ValueError("This does not look like a correct image of coffee cherries. Please upload a valid coffee branch image.")
 
         except ValueError as ve:
@@ -138,6 +140,7 @@ async def upload_and_analyze_cherries(
             annotated_storage_path=analysis_dict.get("annotated_storage_path"),
             uploaded_at=datetime.utcnow(),
             analyzed_at=datetime.utcnow(),
+            analysis_mode=analysis_mode,
             model_version=analysis_dict["model_version"],
             model_status_at_inference=analysis_dict["model_status_at_inference"],
             inference_time_ms=analysis_dict["inference_time_ms"],
@@ -180,6 +183,7 @@ async def upload_and_analyze_cherries(
                 annotated_storage_path=db_analysis.annotated_storage_path,
                 uploaded_at=db_analysis.uploaded_at,
                 analyzed_at=db_analysis.analyzed_at,
+                analysis_mode=db_analysis.analysis_mode or "branch",
                 model_version=db_analysis.model_version,
                 model_status_at_inference=db_analysis.model_status_at_inference,
                 inference_time_ms=db_analysis.inference_time_ms,
@@ -208,7 +212,10 @@ async def upload_and_analyze_cherries(
                 uncertain_pct=analysis_dict.get("uncertain_pct"),
                 mean_confidence=analysis_dict.get("mean_confidence"),
                 denominator_note=analysis_dict.get("denominator_note"),
-                yield_disclaimer=analysis_dict.get("yield_disclaimer")
+                yield_disclaimer=analysis_dict.get("yield_disclaimer"),
+                plant_ripeness_score=analysis_dict.get("plant_ripeness_score"),
+                tiles_processed=analysis_dict.get("tiles_processed"),
+                quality_assessment=analysis_dict.get("quality_assessment")
             )
         )
 
@@ -233,27 +240,41 @@ async def upload_and_analyze_cherries(
 
     avg_uncertain_pct = avg_lowvis
 
-    stage, note = vision_service._interpret_maturity(
-        red_pct=avg_red,
-        yellow_pct=avg_yellow,
-        green_pct=avg_green,
-        dark_brown_pct=avg_brown,
-        low_vis_pct=avg_lowvis,
-        evaluable_red_pct=avg_eval_red,
-        evaluable_yellow_pct=avg_eval_yellow,
-        evaluable_green_pct=avg_eval_green,
-        evaluable_dark_brown_pct=avg_eval_brown,
-        evaluable_cherries=aggregated_evaluable,
-        total_cherries=total_cherries_accum,
-        variety=inferred_variety
-    )
+    if analysis_mode == "whole_plant":
+        stage, note = vision_service._interpret_whole_plant_maturity(
+            evaluable_red_pct=avg_eval_red,
+            evaluable_yellow_pct=avg_eval_yellow,
+            evaluable_green_pct=avg_eval_green,
+            evaluable_dark_brown_pct=avg_eval_brown,
+            evaluable_cherries=aggregated_evaluable,
+            total_cherries=total_cherries_accum,
+            variety=inferred_variety
+        )
+    else:
+        stage, note = vision_service._interpret_maturity(
+            red_pct=avg_red,
+            yellow_pct=avg_yellow,
+            green_pct=avg_green,
+            dark_brown_pct=avg_brown,
+            low_vis_pct=avg_lowvis,
+            evaluable_red_pct=avg_eval_red,
+            evaluable_yellow_pct=avg_eval_yellow,
+            evaluable_green_pct=avg_eval_green,
+            evaluable_dark_brown_pct=avg_eval_brown,
+            evaluable_cherries=aggregated_evaluable,
+            total_cherries=total_cherries_accum,
+            variety=inferred_variety
+        )
 
     display_section_id = effective_section_id or 0
     display_section_name = section.name if section else "General Canopy"
 
+    plant_ripeness_calc = min(100, round((avg_eval_red * 1.0) + (avg_eval_yellow * 0.45)))
+
     return BatchAnalysisResponse(
         section_id=display_section_id,
         section_name=display_section_name,
+        analysis_mode=analysis_mode,
         total_images_analyzed=len(files),
         aggregated_total_cherries=total_cherries_accum,
         avg_red_pct=avg_red,
@@ -270,7 +291,11 @@ async def upload_and_analyze_cherries(
         avg_evaluable_green_pct=avg_eval_green,
         avg_evaluable_dark_brown_pct=avg_eval_brown,
         avg_uncertain_pct=avg_uncertain_pct,
+        plant_ripeness_score=plant_ripeness_calc,
         photographic_yield_disclaimer=(
+            "WHOLE-CANOPY SAMPLING NOTICE: Percentages represent visible canopy clusters. "
+            "Interior cherries obscured by dense foliage are not included in surface optical estimation."
+            if analysis_mode == "whole_plant" else
             "PHOTOGRAPHIC SAMPLING NOTICE: Cherry counts are detected from 2D photographs of canopy branches. "
             "They indicate sampling density and maturity distribution, not total plantation yield per acre."
         )
@@ -302,6 +327,8 @@ def get_analysis_history(
         eval_yellow = round((a.yellow_count / eval_count) * 100, 2) if eval_count > 0 else 0.0
         eval_green = round((a.green_count / eval_count) * 100, 2) if eval_count > 0 else 0.0
         eval_brown = round((a.dark_brown_count / eval_count) * 100, 2) if eval_count > 0 else 0.0
+        p_score = min(100, round((eval_red * 1.0) + (eval_yellow * 0.45)))
+        a_mode = getattr(a, "analysis_mode", "branch") or "branch"
 
         results.append(
             ImageAnalysisResponse(
@@ -312,6 +339,7 @@ def get_analysis_history(
                 annotated_storage_path=a.annotated_storage_path,
                 uploaded_at=a.uploaded_at,
                 analyzed_at=a.analyzed_at,
+                analysis_mode=a_mode,
                 model_version=a.model_version,
                 model_status_at_inference=a.model_status_at_inference,
                 inference_time_ms=a.inference_time_ms,
@@ -337,7 +365,8 @@ def get_analysis_history(
                 evaluable_green_pct=eval_green,
                 evaluable_dark_brown_pct=eval_brown,
                 uncertain_cherries=a.low_visibility_count,
-                uncertain_pct=a.low_visibility_pct
+                uncertain_pct=a.low_visibility_pct,
+                plant_ripeness_score=p_score
             )
         )
     return results

@@ -92,4 +92,14 @@ def run_database_migrations():
             except Exception as e:
                 print(f"[Migration] Notice on image_analyses.section_id migration: {e}")
 
+        # 4. Check for 'analysis_mode' in 'image_analyses'
+        cursor = conn.execute(text("PRAGMA table_info(image_analyses)"))
+        current_analysis_cols = [row[1] for row in cursor.fetchall()]
+        if "analysis_mode" not in current_analysis_cols:
+            try:
+                conn.execute(text("ALTER TABLE image_analyses ADD COLUMN analysis_mode VARCHAR(50) DEFAULT 'branch'"))
+                print("[Migration] Added column 'analysis_mode' to 'image_analyses'")
+            except Exception as e:
+                print(f"[Migration] Notice on image_analyses.analysis_mode: {e}")
+
         conn.commit()

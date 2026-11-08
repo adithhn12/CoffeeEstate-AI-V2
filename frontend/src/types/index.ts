@@ -35,6 +35,7 @@ export interface ImageAnalysis {
   maturity_notes?: string;
   detections?: DetectionBox[];
   is_sample_data: boolean;
+  analysis_mode?: 'branch' | 'whole_plant';
 
   // Enriched Maturity Fields
   evaluable_cherries?: number;
@@ -47,11 +48,15 @@ export interface ImageAnalysis {
   mean_confidence?: number;
   denominator_note?: string;
   yield_disclaimer?: string;
+  plant_ripeness_score?: number;
+  tiles_processed?: number;
+  quality_assessment?: string;
 }
 
 export interface BatchAnalysisResponse {
   section_id?: number | null;
   section_name?: string;
+  analysis_mode?: 'branch' | 'whole_plant';
   total_images_analyzed: number;
   aggregated_total_cherries: number;
   avg_red_pct: number;
@@ -71,6 +76,7 @@ export interface BatchAnalysisResponse {
   avg_evaluable_dark_brown_pct?: number;
   avg_uncertain_pct?: number;
   photographic_yield_disclaimer?: string;
+  plant_ripeness_score?: number;
 }
 
 export interface ModelStatusInfo {
