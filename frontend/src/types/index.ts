@@ -70,7 +70,6 @@ export interface ImageAnalysis {
 export interface BatchAnalysisResponse {
   section_id?: number | null;
   section_name?: string;
-  analysis_mode?: 'branch' | 'whole_plant';
   total_images_analyzed: number;
   aggregated_total_cherries: number;
   avg_red_pct: number;

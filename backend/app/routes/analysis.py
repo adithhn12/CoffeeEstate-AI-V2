@@ -46,6 +46,7 @@ async def upload_and_analyze_cherries(
 
     Rule 1: Anyone can access and analyze photos without login.
     Rule 2: If the user is logged in, the analysis record is saved to the SQLite database.
+
     """
     section: Optional[Section] = None
     if section_id is not None:
@@ -176,6 +177,7 @@ async def upload_and_analyze_cherries(
             saved_id = db_analysis.id
             is_sample = db_analysis.is_sample_data
 
+
         # Aggregate counts
         total_cherries_accum += analysis_dict["total_cherries"]
         red_counts_accum += analysis_dict["red_count"]
@@ -213,6 +215,7 @@ async def upload_and_analyze_cherries(
                 yellow_pct=analysis_dict["yellow_pct"],
                 maturity_stage=analysis_dict["maturity_stage"],
                 maturity_notes=analysis_dict["maturity_notes"],
+
                 detections=analysis_dict.get("detections"),
                 is_sample_data=is_sample,
                 evaluable_cherries=analysis_dict.get("evaluable_cherries"),
@@ -283,6 +286,7 @@ async def upload_and_analyze_cherries(
     return BatchAnalysisResponse(
         section_id=effective_section_id,
         section_name=section.name if section else None,
+
         analysis_mode=analysis_mode,
         total_images_analyzed=len(files),
         aggregated_total_cherries=total_cherries_accum,
