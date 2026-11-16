@@ -135,21 +135,17 @@ export const Layout: React.FC = () => {
                 </div>
                 {!collapsed && (
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-white truncate max-w-[110px]">
-                        {user.username}
-                      </span>
-                      <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
-                    </div>
-                    <span className="text-[10px] text-emerald-400/90 block">History Saving Active</span>
+                    <span className="text-xs font-semibold text-white truncate max-w-[130px] block">
+                      {user.username}
+                    </span>
                   </div>
                 )}
               </div>
               {!collapsed && (
                 <button
                   onClick={logout}
-                  title="Log Out"
-                  className="p-1.5 text-estate-400 hover:text-rose-400 hover:bg-estate-800 rounded-lg transition-colors"
+                  title="Sign out"
+                  className="p-1.5 text-estate-400 hover:text-rose-400 hover:bg-estate-800 rounded-lg transition-colors cursor-pointer"
                 >
                   <LogOut size={16} />
                 </button>
@@ -159,13 +155,12 @@ export const Layout: React.FC = () => {
             <div className="flex flex-col gap-2">
               {!collapsed ? (
                 <>
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-estate-400">Mode</span>
-                    <span className="px-1.5 py-0.5 rounded bg-estate-900 border border-estate-800 text-stone-300 font-medium">Guest</span>
+                  <div className="text-[11px] font-medium text-estate-300">
+                    Guest
                   </div>
                   <button
                     onClick={() => openAuth('login')}
-                    className="w-full py-2.5 px-3 bg-estate-800 hover:bg-estate-700 active:bg-estate-900 border border-emerald-500/30 text-emerald-300 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition"
+                    className="w-full py-2.5 px-3 bg-estate-800 hover:bg-estate-700 active:bg-estate-900 border border-emerald-500/30 text-emerald-300 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition cursor-pointer"
                   >
                     <LogIn size={14} className="text-emerald-400" />
                     <span>Login</span>
