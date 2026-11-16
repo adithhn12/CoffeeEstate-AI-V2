@@ -10,7 +10,8 @@ class DetectionBox(BaseModel):
     pixel_coords: Optional[List[int]] = None  # [x1, y1, x2, y2] in pixels
 
 class ImageAnalysisResponse(BaseModel):
-    id: int
+    id: Optional[int] = 0
+    user_id: Optional[int] = None
     section_id: Optional[int] = None
     original_filename: str
     storage_path: str

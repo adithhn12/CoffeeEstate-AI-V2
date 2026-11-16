@@ -9,6 +9,7 @@ class ImageAnalysis(Base):
     __tablename__ = "image_analyses"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     section_id = Column(Integer, ForeignKey("sections.id", ondelete="CASCADE"), nullable=True)
     original_filename = Column(String(255), nullable=False)
     storage_path = Column(String(500), nullable=False)
@@ -48,3 +49,4 @@ class ImageAnalysis(Base):
 
     # Relationships
     section = relationship("Section", back_populates="image_analyses")
+    user = relationship("User", back_populates="image_analyses")

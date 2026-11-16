@@ -10,9 +10,10 @@ from app.database import engine, Base, SessionLocal
 from app.database_migrations import run_database_migrations
 from app.services.sample_data import seed_sample_data_if_empty
 
-# Import routers for the 2 active modules: Ripeness Analysis and Model Status
+# Import routers
 from app.routes.health import router as health_router
 from app.routes.analysis import router as analysis_router, sample_data_router
+from app.routes.auth import router as auth_router
 
 # Initialize database schema
 Base.metadata.create_all(bind=engine)
@@ -52,26 +53,15 @@ app.mount("/uploads", StaticFiles(directory=str(settings.UPLOAD_DIR)), name="upl
 app.include_router(health_router)
 app.include_router(analysis_router)
 app.include_router(sample_data_router)
+app.include_router(auth_router)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     print(f"Unhandled error processing {request.url}: {exc}")
     return JSONResponse(
         status_code=500,
-        content={
-            "error": "InternalServerError",
-            "message": "An unexpected error occurred while processing your request. Please check application logs."
-        }
+        content={"detail": "An internal server error occurred while processing the request."}
     )
-
-@app.get("/")
-def root():
-    return {
-        "app": settings.APP_NAME,
-        "version": settings.APP_VERSION,
-        "features": ["Coffee Cherry Ripeness Analysis", "Model Diagnostics & Status"],
-        "docs_url": "/docs"
-    }
 
 if __name__ == "__main__":
     import uvicorn

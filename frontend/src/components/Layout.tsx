@@ -5,16 +5,26 @@ import {
   ShieldCheck,
   ChevronRight,
   ChevronLeft,
-  Sparkles
+  Sparkles,
+  LogIn,
+  LogOut,
+  User as UserIcon,
+  CheckCircle2
 } from 'lucide-react';
 import { api } from '../api/client';
 import { HealthStatus, ModelStatusInfo } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { AuthModal } from './AuthModal';
 
 export const Layout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [modelStatus, setModelStatus] = useState<ModelStatusInfo | null>(null);
   const [loadingSeed, setLoadingSeed] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -49,7 +59,11 @@ export const Layout: React.FC = () => {
     }
   };
 
-  // The 2 active modules for this development phase
+  const openAuth = (mode: 'login' | 'register') => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+  };
+
   const navItems = [
     {
       label: 'Ripeness Analysis',
@@ -111,6 +125,65 @@ export const Layout: React.FC = () => {
           </button>
         </div>
 
+        {/* User Account Bar in Desktop Sidebar */}
+        <div className="p-3 border-b border-estate-900/80 bg-estate-900/40">
+          {user ? (
+            <div className={`flex items-center ${collapsed ? 'justify-center' : 'justify-between'} gap-2`}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center font-bold text-xs shrink-0">
+                  {user.username.charAt(0).toUpperCase()}
+                </div>
+                {!collapsed && (
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-white truncate max-w-[110px]">
+                        {user.username}
+                      </span>
+                      <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+                    </div>
+                    <span className="text-[10px] text-emerald-400/90 block">History Saving Active</span>
+                  </div>
+                )}
+              </div>
+              {!collapsed && (
+                <button
+                  onClick={logout}
+                  title="Log Out"
+                  className="p-1.5 text-estate-400 hover:text-rose-400 hover:bg-estate-800 rounded-lg transition-colors"
+                >
+                  <LogOut size={16} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {!collapsed ? (
+                <>
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="text-estate-400">Mode</span>
+                    <span className="px-1.5 py-0.5 rounded bg-estate-900 border border-estate-800 text-stone-300 font-medium">Guest</span>
+                  </div>
+                  <button
+                    onClick={() => openAuth('login')}
+                    className="w-full py-2.5 px-3 bg-estate-800 hover:bg-estate-700 active:bg-estate-900 border border-emerald-500/30 text-emerald-300 hover:text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition"
+                  >
+                    <LogIn size={14} className="text-emerald-400" />
+                    <span>Login</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => openAuth('login')}
+                  title="Login"
+                  className="w-10 h-10 mx-auto rounded-xl bg-estate-800 border border-emerald-500/30 text-emerald-400 flex items-center justify-center hover:bg-estate-700 transition"
+                >
+                  <LogIn size={18} />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Navigation List */}
         <nav className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
           {navItems.map((item) => {
@@ -144,7 +217,7 @@ export const Layout: React.FC = () => {
 
         {/* Desktop Footer */}
         {!collapsed && (
-          <div className="p-4 border-t border-estate-900/80 bg-estate-950/60 text-xs text-estate-300">
+          <div className="p-4 border-t border-estate-900/80 bg-estate-950/60 text-xs text-estate-300 space-y-2">
             <button
               onClick={handleSeedData}
               disabled={loadingSeed}
@@ -172,9 +245,34 @@ export const Layout: React.FC = () => {
               </p>
             </div>
           </div>
+
+          {/* Mobile Auth Button */}
+          <div>
+            {user ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-stone-800 bg-stone-100 px-2 py-1 rounded-lg">
+                  {user.username}
+                </span>
+                <button
+                  onClick={logout}
+                  className="p-1.5 text-stone-500 hover:text-rose-600 rounded-lg"
+                  title="Log out"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => openAuth('login')}
+                className="text-xs font-semibold px-3 py-1.5 bg-estate-900 hover:bg-estate-800 text-white rounded-xl shadow-xs transition"
+              >
+                Login
+              </button>
+            )}
+          </div>
         </header>
 
-        {/* Routed Page Content with safe padding for mobile bottom nav */}
+        {/* Routed Page Content */}
         <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6 md:p-8 max-w-5xl mx-auto w-full pb-24 md:pb-8">
           <Outlet />
         </main>
@@ -212,7 +310,13 @@ export const Layout: React.FC = () => {
           );
         })}
       </nav>
+
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        defaultMode={authModalMode}
+      />
     </div>
   );
 };
-

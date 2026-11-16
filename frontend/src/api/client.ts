@@ -2,13 +2,29 @@ import {
   ImageAnalysis,
   BatchAnalysisResponse,
   ModelStatusInfo,
-  HealthStatus
+  HealthStatus,
+  AuthResponse,
+  User
 } from '../types';
 
 const API_BASE = '/api';
 
+function getAuthHeaders(): HeadersInit {
+  const token = localStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(url, options);
+  const mergedHeaders: HeadersInit = {
+    ...getAuthHeaders(),
+    ...(options?.headers || {})
+  };
+
+  const res = await fetch(url, {
+    ...options,
+    headers: mergedHeaders
+  });
+
   if (!res.ok) {
     let errorDetail = 'API request failed';
     try {
@@ -23,6 +39,23 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Auth
+  register: (username: string, email: string, password: string) =>
+    fetchJson<AuthResponse>(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password })
+    }),
+
+  login: (username_or_email: string, password: string) =>
+    fetchJson<AuthResponse>(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username_or_email, password })
+    }),
+
+  getMe: () => fetchJson<User>(`${API_BASE}/auth/me`),
+
   // Health
   getHealth: () => fetchJson<HealthStatus>(`${API_BASE}/health`),
 
