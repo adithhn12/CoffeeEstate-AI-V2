@@ -1,5 +1,14 @@
 from app.schemas.analysis import (
-    DetectionBox, ImageAnalysisResponse, BatchAnalysisResponse, ModelStatusResponse
+    DetectionBox,
+    ImageAnalysisResponse,
+    BatchAnalysisResponse,
+    ModelStatusResponse
+)
+from app.schemas.auth import (
+    UserRegisterRequest,
+    UserLoginRequest,
+    UserResponse,
+    TokenResponse
 )
 
 __all__ = [
@@ -7,4 +16,8 @@ __all__ = [
     "ImageAnalysisResponse",
     "BatchAnalysisResponse",
     "ModelStatusResponse",
+    "UserRegisterRequest",
+    "UserLoginRequest",
+    "UserResponse",
+    "TokenResponse"
 ]

@@ -89,3 +89,58 @@ def test_analysis_history_and_deletion():
     del_res = client.delete(f"/api/analysis/history/{target_id}")
     assert del_res.status_code == 200
     assert del_res.json()["message"] == "Analysis deleted successfully"
+
+def test_whole_plant_mode_and_tile_duplicate_reconciliation():
+    """Verifies that whole-plant mode processes tiled patches, reconciles duplicates, and suppresses bounding boxes."""
+    test_img = Path("datasets/croppie_coffee/extracted/val/images/1687438155343.jpg")
+    assert test_img.exists()
+
+    with open(test_img, "rb") as f:
+        res = client.post(
+            "/api/analysis/upload",
+            data={"confidence_threshold": 0.25, "analysis_mode": "whole_plant"},
+            files={"files": ("canopy_test.jpg", f, "image/jpeg")}
+        )
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["analysis_mode"] == "whole_plant"
+    assert "plant_ripeness_score" in data
+    assert 0 <= data["plant_ripeness_score"] <= 100
+
+    item = data["individual_results"][0]
+    assert item["annotated_storage_path"] is None
+    assert len(item["detections"]) == 0
+    assert item["total_cherries"] >= 10
+    assert item["tiles_processed"] >= 1
+    assert item["quality_assessment"] is not None
+
+def test_reconcile_tile_duplicates_direct():
+    """Verifies that duplicate bounding boxes across overlapping tiles are reconciled via NMS."""
+    boxes = [
+        [100.0, 100.0, 150.0, 150.0, 0.85, 3],
+        [102.0, 101.0, 151.0, 152.0, 0.72, 3],
+        [300.0, 300.0, 350.0, 350.0, 0.91, 1],
+    ]
+    reconciled = vision_service._reconcile_tile_duplicates(boxes, width=640, height=640, iou_threshold=0.45)
+    assert len(reconciled) == 2
+    confs = [b[4] for b in reconciled]
+    assert 0.85 in confs
+    assert 0.91 in confs
+    assert 0.72 not in confs
+
+def test_whole_plant_insufficient_visual_detail_rejection():
+    """Verifies that an image with insufficient visual detail in whole plant mode returns 400 Bad Request."""
+    import cv2
+    import numpy as np
+    blank_img = np.full((640, 640, 3), (40, 120, 40), dtype=np.uint8)
+    _, enc = cv2.imencode(".jpg", blank_img)
+    blank_bytes = enc.tobytes()
+
+    res = client.post(
+        "/api/analysis/upload",
+        data={"confidence_threshold": 0.25, "analysis_mode": "whole_plant"},
+        files={"files": ("blank_plant.jpg", blank_bytes, "image/jpeg")}
+    )
+    assert res.status_code == 400
+    assert "Insufficient visual detail" in res.json()["detail"]

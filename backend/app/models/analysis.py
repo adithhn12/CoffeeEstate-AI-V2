@@ -9,6 +9,7 @@ class ImageAnalysis(Base):
     __tablename__ = "image_analyses"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
     section_id = Column(Integer, ForeignKey("sections.id", ondelete="CASCADE"), nullable=True)
     original_filename = Column(String(255), nullable=False)
     storage_path = Column(String(500), nullable=False)
@@ -17,6 +18,7 @@ class ImageAnalysis(Base):
     # Metadata
     uploaded_at = Column(DateTime, default=datetime.utcnow)
     analyzed_at = Column(DateTime, default=datetime.utcnow)
+    analysis_mode = Column(String(50), default="branch")  # 'branch' or 'whole_plant'
     model_version = Column(String(100), default="YOLOv8s-Croppie-v1.0")
     model_status_at_inference = Column(String(100), default="Trained on public dataset")
     inference_time_ms = Column(Float, default=0.0)
@@ -47,3 +49,4 @@ class ImageAnalysis(Base):
 
     # Relationships
     section = relationship("Section", back_populates="image_analyses")
+    user = relationship("User", back_populates="image_analyses")

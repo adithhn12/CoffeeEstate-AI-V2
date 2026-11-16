@@ -6,8 +6,22 @@ export interface DetectionBox {
   pixel_coords?: [number, number, number, number]; // [x1, y1, x2, y2]
 }
 
+export interface User {
+  id: number;
+  username: string;
+  email: string;
+  created_at: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
 export interface ImageAnalysis {
   id: number;
+  user_id?: number | null;
   section_id?: number | null;
   section_name?: string;
   section_code?: string;
@@ -16,6 +30,7 @@ export interface ImageAnalysis {
   annotated_storage_path?: string;
   uploaded_at: string;
   analyzed_at: string;
+  analysis_mode?: 'branch' | 'whole_plant';
   model_version: string;
   model_status_at_inference: string;
   inference_time_ms: number;
@@ -47,11 +62,15 @@ export interface ImageAnalysis {
   mean_confidence?: number;
   denominator_note?: string;
   yield_disclaimer?: string;
+  plant_ripeness_score?: number;
+  tiles_processed?: number;
+  quality_assessment?: string;
 }
 
 export interface BatchAnalysisResponse {
   section_id?: number | null;
   section_name?: string;
+  analysis_mode?: 'branch' | 'whole_plant';
   total_images_analyzed: number;
   aggregated_total_cherries: number;
   avg_red_pct: number;
@@ -71,6 +90,7 @@ export interface BatchAnalysisResponse {
   avg_evaluable_dark_brown_pct?: number;
   avg_uncertain_pct?: number;
   photographic_yield_disclaimer?: string;
+  plant_ripeness_score?: number;
 }
 
 export interface ModelStatusInfo {

@@ -13,9 +13,11 @@ from app.config import settings
 from app.database import get_db
 from app.models.estate import Section
 from app.models.analysis import ImageAnalysis
+from app.models.user import User
 from app.schemas.analysis import ImageAnalysisResponse, BatchAnalysisResponse, ModelStatusResponse
 from app.services.vision_service import vision_service
 from app.services.sample_data import seed_sample_data_if_empty, clear_all_sample_data
+from app.auth import get_optional_current_user, get_current_user
 
 router = APIRouter(prefix="/api/analysis", tags=["Ripeness Analysis & CV"])
 sample_data_router = APIRouter(prefix="/api/sample-data", tags=["Sample Data"])
@@ -32,14 +34,18 @@ def get_model_status():
 async def upload_and_analyze_cherries(
     section_id: Optional[int] = Form(default=None),
     confidence_threshold: float = Form(default=0.25),
+    analysis_mode: str = Form(default="branch"),
     files: List[UploadFile] = File(...),
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
     """
     Accepts one or more coffee cherry photos, verifies image validity,
-    runs the YOLO cherry detection pipeline, annotates bounding boxes,
-    calculates class counts, ripeness percentages, maturity stage,
-    and persists results to SQLite.
+    runs the YOLO cherry detection pipeline (Branch close-up or Whole-Plant canopy),
+    calculates class counts, ripeness percentages, and maturity stage.
+
+    Rule 1: Anyone can access and analyze photos without login.
+    Rule 2: If the user is logged in, the analysis record is saved to the SQLite database.
     """
     section: Optional[Section] = None
     if section_id is not None:
@@ -97,18 +103,19 @@ async def upload_and_analyze_cherries(
             analysis_dict = vision_service.analyze_image(
                 image_path=raw_path,
                 confidence_threshold=confidence_threshold,
-                save_annotated=True,
-                variety=inferred_variety
+                save_annotated=(analysis_mode == "branch"),
+                variety=inferred_variety,
+                mode=analysis_mode
             )
             
-            # Additional direct validation check inside the route loop
+            # Additional direct validation check inside the route loop for branch mode
             evaluable_count = (
                 analysis_dict.get("red_count", 0) +
                 analysis_dict.get("yellow_count", 0) +
                 analysis_dict.get("green_count", 0) +
                 analysis_dict.get("dark_brown_count", 0)
             )
-            if analysis_dict.get("total_cherries", 0) < 3 or evaluable_count == 0:
+            if analysis_mode == "branch" and (analysis_dict.get("total_cherries", 0) < 3 or evaluable_count == 0):
                 raise ValueError("This does not look like a correct image of coffee cherries. Please upload a valid coffee branch image.")
 
         except ValueError as ve:
@@ -130,37 +137,44 @@ async def upload_and_analyze_cherries(
                 detail=f"Error analyzing image '{file.filename}': {str(e)}"
             )
 
-        # 4. Save ImageAnalysis record to Database
-        db_analysis = ImageAnalysis(
-            section_id=effective_section_id,
-            original_filename=file.filename,
-            storage_path=f"uploads/raw/{safe_filename}",
-            annotated_storage_path=analysis_dict.get("annotated_storage_path"),
-            uploaded_at=datetime.utcnow(),
-            analyzed_at=datetime.utcnow(),
-            model_version=analysis_dict["model_version"],
-            model_status_at_inference=analysis_dict["model_status_at_inference"],
-            inference_time_ms=analysis_dict["inference_time_ms"],
-            confidence_threshold=confidence_threshold,
-            total_cherries=analysis_dict["total_cherries"],
-            dark_brown_count=analysis_dict["dark_brown_count"],
-            green_count=analysis_dict["green_count"],
-            low_visibility_count=analysis_dict["low_visibility_count"],
-            red_count=analysis_dict["red_count"],
-            yellow_count=analysis_dict["yellow_count"],
-            dark_brown_pct=analysis_dict["dark_brown_pct"],
-            green_pct=analysis_dict["green_pct"],
-            low_visibility_pct=analysis_dict["low_visibility_pct"],
-            red_pct=analysis_dict["red_pct"],
-            yellow_pct=analysis_dict["yellow_pct"],
-            maturity_stage=analysis_dict["maturity_stage"],
-            maturity_notes=analysis_dict["maturity_notes"],
-            detections_json=json.dumps(analysis_dict.get("detections", [])),
-            is_sample_data=False
-        )
-        db.add(db_analysis)
-        db.commit()
-        db.refresh(db_analysis)
+        # 4. Save ImageAnalysis record to Database ONLY if user is logged in
+        saved_id = 0
+        is_sample = False
+        if current_user:
+            db_analysis = ImageAnalysis(
+                user_id=current_user.id,
+                section_id=effective_section_id,
+                original_filename=file.filename,
+                storage_path=f"uploads/raw/{safe_filename}",
+                annotated_storage_path=analysis_dict.get("annotated_storage_path"),
+                uploaded_at=datetime.utcnow(),
+                analyzed_at=datetime.utcnow(),
+                analysis_mode=analysis_mode,
+                model_version=analysis_dict["model_version"],
+                model_status_at_inference=analysis_dict["model_status_at_inference"],
+                inference_time_ms=analysis_dict["inference_time_ms"],
+                confidence_threshold=confidence_threshold,
+                total_cherries=analysis_dict["total_cherries"],
+                dark_brown_count=analysis_dict["dark_brown_count"],
+                green_count=analysis_dict["green_count"],
+                low_visibility_count=analysis_dict["low_visibility_count"],
+                red_count=analysis_dict["red_count"],
+                yellow_count=analysis_dict["yellow_count"],
+                dark_brown_pct=analysis_dict["dark_brown_pct"],
+                green_pct=analysis_dict["green_pct"],
+                low_visibility_pct=analysis_dict["low_visibility_pct"],
+                red_pct=analysis_dict["red_pct"],
+                yellow_pct=analysis_dict["yellow_pct"],
+                maturity_stage=analysis_dict["maturity_stage"],
+                maturity_notes=analysis_dict["maturity_notes"],
+                detections_json=json.dumps(analysis_dict.get("detections", [])),
+                is_sample_data=False
+            )
+            db.add(db_analysis)
+            db.commit()
+            db.refresh(db_analysis)
+            saved_id = db_analysis.id
+            is_sample = db_analysis.is_sample_data
 
         # Aggregate counts
         total_cherries_accum += analysis_dict["total_cherries"]
@@ -173,32 +187,34 @@ async def upload_and_analyze_cherries(
         # Parse response item
         individual_results.append(
             ImageAnalysisResponse(
-                id=db_analysis.id,
-                section_id=db_analysis.section_id,
-                original_filename=db_analysis.original_filename,
-                storage_path=db_analysis.storage_path,
-                annotated_storage_path=db_analysis.annotated_storage_path,
-                uploaded_at=db_analysis.uploaded_at,
-                analyzed_at=db_analysis.analyzed_at,
-                model_version=db_analysis.model_version,
-                model_status_at_inference=db_analysis.model_status_at_inference,
-                inference_time_ms=db_analysis.inference_time_ms,
-                confidence_threshold=db_analysis.confidence_threshold,
-                total_cherries=db_analysis.total_cherries,
-                dark_brown_count=db_analysis.dark_brown_count,
-                green_count=db_analysis.green_count,
-                low_visibility_count=db_analysis.low_visibility_count,
-                red_count=db_analysis.red_count,
-                yellow_count=db_analysis.yellow_count,
-                dark_brown_pct=db_analysis.dark_brown_pct,
-                green_pct=db_analysis.green_pct,
-                low_visibility_pct=db_analysis.low_visibility_pct,
-                red_pct=db_analysis.red_pct,
-                yellow_pct=db_analysis.yellow_pct,
-                maturity_stage=db_analysis.maturity_stage,
-                maturity_notes=db_analysis.maturity_notes,
+                id=saved_id,
+                user_id=current_user.id if current_user else None,
+                section_id=effective_section_id,
+                original_filename=file.filename,
+                storage_path=f"uploads/raw/{safe_filename}",
+                annotated_storage_path=analysis_dict.get("annotated_storage_path"),
+                uploaded_at=datetime.utcnow(),
+                analyzed_at=datetime.utcnow(),
+                analysis_mode=analysis_mode,
+                model_version=analysis_dict["model_version"],
+                model_status_at_inference=analysis_dict["model_status_at_inference"],
+                inference_time_ms=analysis_dict["inference_time_ms"],
+                confidence_threshold=confidence_threshold,
+                total_cherries=analysis_dict["total_cherries"],
+                dark_brown_count=analysis_dict["dark_brown_count"],
+                green_count=analysis_dict["green_count"],
+                low_visibility_count=analysis_dict["low_visibility_count"],
+                red_count=analysis_dict["red_count"],
+                yellow_count=analysis_dict["yellow_count"],
+                dark_brown_pct=analysis_dict["dark_brown_pct"],
+                green_pct=analysis_dict["green_pct"],
+                low_visibility_pct=analysis_dict["low_visibility_pct"],
+                red_pct=analysis_dict["red_pct"],
+                yellow_pct=analysis_dict["yellow_pct"],
+                maturity_stage=analysis_dict["maturity_stage"],
+                maturity_notes=analysis_dict["maturity_notes"],
                 detections=analysis_dict.get("detections"),
-                is_sample_data=db_analysis.is_sample_data,
+                is_sample_data=is_sample,
                 evaluable_cherries=analysis_dict.get("evaluable_cherries"),
                 evaluable_red_pct=analysis_dict.get("evaluable_red_pct"),
                 evaluable_yellow_pct=analysis_dict.get("evaluable_yellow_pct"),
@@ -208,7 +224,10 @@ async def upload_and_analyze_cherries(
                 uncertain_pct=analysis_dict.get("uncertain_pct"),
                 mean_confidence=analysis_dict.get("mean_confidence"),
                 denominator_note=analysis_dict.get("denominator_note"),
-                yield_disclaimer=analysis_dict.get("yield_disclaimer")
+                yield_disclaimer=analysis_dict.get("yield_disclaimer"),
+                plant_ripeness_score=analysis_dict.get("plant_ripeness_score"),
+                tiles_processed=analysis_dict.get("tiles_processed"),
+                quality_assessment=analysis_dict.get("quality_assessment")
             )
         )
 
@@ -233,27 +252,38 @@ async def upload_and_analyze_cherries(
 
     avg_uncertain_pct = avg_lowvis
 
-    stage, note = vision_service._interpret_maturity(
-        red_pct=avg_red,
-        yellow_pct=avg_yellow,
-        green_pct=avg_green,
-        dark_brown_pct=avg_brown,
-        low_vis_pct=avg_lowvis,
-        evaluable_red_pct=avg_eval_red,
-        evaluable_yellow_pct=avg_eval_yellow,
-        evaluable_green_pct=avg_eval_green,
-        evaluable_dark_brown_pct=avg_eval_brown,
-        evaluable_cherries=aggregated_evaluable,
-        total_cherries=total_cherries_accum,
-        variety=inferred_variety
-    )
+    if analysis_mode == "whole_plant":
+        stage, note = vision_service._interpret_whole_plant_maturity(
+            evaluable_red_pct=avg_eval_red,
+            evaluable_yellow_pct=avg_eval_yellow,
+            evaluable_green_pct=avg_eval_green,
+            evaluable_dark_brown_pct=avg_eval_brown,
+            evaluable_cherries=aggregated_evaluable,
+            total_cherries=total_cherries_accum,
+            variety=inferred_variety
+        )
+    else:
+        stage, note = vision_service._interpret_maturity(
+            red_pct=avg_red,
+            yellow_pct=avg_yellow,
+            green_pct=avg_green,
+            dark_brown_pct=avg_brown,
+            low_vis_pct=avg_lowvis,
+            evaluable_red_pct=avg_eval_red,
+            evaluable_yellow_pct=avg_eval_yellow,
+            evaluable_green_pct=avg_eval_green,
+            evaluable_dark_brown_pct=avg_eval_brown,
+            evaluable_cherries=aggregated_evaluable,
+            total_cherries=total_cherries_accum,
+            variety=inferred_variety
+        )
 
-    display_section_id = effective_section_id or 0
-    display_section_name = section.name if section else "General Canopy"
+    plant_ripeness_calc = min(100, round((avg_eval_red * 1.0) + (avg_eval_yellow * 0.45)))
 
     return BatchAnalysisResponse(
-        section_id=display_section_id,
-        section_name=display_section_name,
+        section_id=effective_section_id,
+        section_name=section.name if section else None,
+        analysis_mode=analysis_mode,
         total_images_analyzed=len(files),
         aggregated_total_cherries=total_cherries_accum,
         avg_red_pct=avg_red,
@@ -270,7 +300,11 @@ async def upload_and_analyze_cherries(
         avg_evaluable_green_pct=avg_eval_green,
         avg_evaluable_dark_brown_pct=avg_eval_brown,
         avg_uncertain_pct=avg_uncertain_pct,
+        plant_ripeness_score=plant_ripeness_calc,
         photographic_yield_disclaimer=(
+            "WHOLE-CANOPY SAMPLING NOTICE: Percentages represent visible canopy clusters. "
+            "Interior cherries obscured by dense foliage are not included in surface optical estimation."
+            if analysis_mode == "whole_plant" else
             "PHOTOGRAPHIC SAMPLING NOTICE: Cherry counts are detected from 2D photographs of canopy branches. "
             "They indicate sampling density and maturity distribution, not total plantation yield per acre."
         )
@@ -280,10 +314,18 @@ async def upload_and_analyze_cherries(
 def get_analysis_history(
     section_id: Optional[int] = None,
     limit: int = 50,
+    current_user: Optional[User] = Depends(get_optional_current_user),
     db: Session = Depends(get_db)
 ):
-    """Fetches previously analyzed images and detection breakdowns."""
-    query = db.query(ImageAnalysis)
+    """
+    Fetches previously analyzed images and detection breakdowns.
+    - If user is logged in: returns only that user's saved scans.
+    - If user is guest (not logged in): returns empty list.
+    """
+    if not current_user:
+        return []
+
+    query = db.query(ImageAnalysis).filter(ImageAnalysis.user_id == current_user.id)
     if section_id:
         query = query.filter(ImageAnalysis.section_id == section_id)
     analyses = query.order_by(ImageAnalysis.analyzed_at.desc()).limit(limit).all()
@@ -302,16 +344,20 @@ def get_analysis_history(
         eval_yellow = round((a.yellow_count / eval_count) * 100, 2) if eval_count > 0 else 0.0
         eval_green = round((a.green_count / eval_count) * 100, 2) if eval_count > 0 else 0.0
         eval_brown = round((a.dark_brown_count / eval_count) * 100, 2) if eval_count > 0 else 0.0
+        p_score = min(100, round((eval_red * 1.0) + (eval_yellow * 0.45)))
+        a_mode = getattr(a, "analysis_mode", "branch") or "branch"
 
         results.append(
             ImageAnalysisResponse(
                 id=a.id,
+                user_id=a.user_id,
                 section_id=a.section_id,
                 original_filename=a.original_filename,
                 storage_path=a.storage_path,
                 annotated_storage_path=a.annotated_storage_path,
                 uploaded_at=a.uploaded_at,
                 analyzed_at=a.analyzed_at,
+                analysis_mode=a_mode,
                 model_version=a.model_version,
                 model_status_at_inference=a.model_status_at_inference,
                 inference_time_ms=a.inference_time_ms,
@@ -337,17 +383,25 @@ def get_analysis_history(
                 evaluable_green_pct=eval_green,
                 evaluable_dark_brown_pct=eval_brown,
                 uncertain_cherries=a.low_visibility_count,
-                uncertain_pct=a.low_visibility_pct
+                uncertain_pct=a.low_visibility_pct,
+                plant_ripeness_score=p_score
             )
         )
     return results
 
 @router.delete("/history/{analysis_id}")
-def delete_analysis(analysis_id: int, db: Session = Depends(get_db)):
-    """Deletes an analysis record and its corresponding images."""
-    record = db.query(ImageAnalysis).filter(ImageAnalysis.id == analysis_id).first()
+def delete_analysis(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Deletes an analysis record belonging to the logged-in user and its corresponding images."""
+    record = db.query(ImageAnalysis).filter(
+        ImageAnalysis.id == analysis_id,
+        ImageAnalysis.user_id == current_user.id
+    ).first()
     if not record:
-        raise HTTPException(status_code=404, detail="Analysis record not found")
+        raise HTTPException(status_code=404, detail="Analysis record not found or unauthorized")
 
     try:
         if record.storage_path and os.path.exists(record.storage_path):
