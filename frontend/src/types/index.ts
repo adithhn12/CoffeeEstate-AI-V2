@@ -95,6 +95,8 @@ export interface BatchAnalysisResponse {
 export interface ModelStatusInfo {
   model_name: string;
   model_version: string;
+  active_architecture?: string;
+  frcnn_active?: boolean;
   weights_path: string;
   weights_exist: boolean;
   device: string;

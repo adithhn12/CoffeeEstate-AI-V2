@@ -120,7 +120,7 @@ export const SettingsModel: React.FC = () => {
               <div className="p-3 bg-stone-50 rounded-xl border border-stone-200">
                 <span className="text-stone-500 block text-[11px] mb-1">Architecture</span>
                 <span className="font-semibold text-stone-900 block font-mono">
-                  YOLOv8n (Nano) — Object Detection
+                  {modelStatus?.active_architecture || 'Faster R-CNN (ResNet50-FPN)'}
                 </span>
               </div>
 

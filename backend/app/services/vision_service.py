@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional
 from PIL import Image
 
+import torch
+import torchvision.transforms.functional as TF
+
 from app.config import settings
 
 # Hex and BGR color definitions for visual annotations
@@ -24,7 +27,15 @@ class VisionService:
         self.model_status = "Model not trained"
         self.model_version = "YOLOv8-Croppie-Public-v1.0"
         self.active_weights_path = None
+
+        # Faster R-CNN state (loaded alongside / instead of YOLO when available)
+        self._frcnn_model = None
+        self._frcnn_device = None
+        self._frcnn_conf_thresh = settings.CONFIDENCE_THRESHOLD
+        self._frcnn_active = False
+
         self._load_model()
+        self._load_frcnn_model()
 
     def _load_model(self):
         """
@@ -77,7 +88,58 @@ class VisionService:
     def reload_model(self) -> Dict[str, Any]:
         """Dynamically re-scans disk for newest trained weights and reloads model into memory."""
         self._load_model()
+        self._load_frcnn_model()
         return self.get_model_status_info()
+
+    # ──────────────────────────────────────────────────────────────────────
+    # Faster R-CNN loader (additive — does not replace YOLO)
+    # ──────────────────────────────────────────────────────────────────────
+
+    def _load_frcnn_model(self):
+        """
+        Scan for a trained Faster R-CNN checkpoint (frcnn_best.pth or frcnn_last.pth).
+        If found, load it into self._frcnn_model so inference can use it.
+        Does NOT raise on failure — falls back to YOLO / heuristic.
+        """
+        candidate_paths = [
+            Path(settings.BASE_DIR) / "ml" / "weights" / "frcnn_best.pth",
+            Path(settings.BASE_DIR) / "ml" / "weights" / "frcnn_last.pth",
+        ]
+        target_path = None
+        for c in candidate_paths:
+            if c.exists() and c.is_file():
+                target_path = c
+                break
+
+        if target_path is None:
+            print("[VisionService] No Faster R-CNN checkpoint found — FRCNN inference inactive.")
+            self._frcnn_active = False
+            return
+
+        try:
+            # Import model builder (located in ml/ at project root)
+            import sys as _sys
+            _sys.path.insert(0, str(settings.BASE_DIR))
+            from ml.model_frcnn import build_fasterrcnn, NUM_CLASSES
+
+            cuda_ok = torch.cuda.is_available()
+            self._frcnn_device = torch.device("cuda:0" if cuda_ok else "cpu")
+
+            frcnn = build_fasterrcnn(num_classes=NUM_CLASSES, pretrained=False)
+            ckpt = torch.load(str(target_path), map_location=self._frcnn_device)
+            frcnn.load_state_dict(ckpt["model_state_dict"])
+            frcnn.to(self._frcnn_device)
+            frcnn.eval()
+
+            self._frcnn_model = frcnn
+            self._frcnn_active = True
+            epoch = ckpt.get("epoch", "?")
+            map50 = ckpt.get("map50", "N/A")
+            print(f"[VisionService] Loaded Faster R-CNN from {target_path} "
+                  f"(epoch={epoch}, mAP@50={map50})")
+        except Exception as exc:
+            print(f"[VisionService] Faster R-CNN load failed: {exc} — FRCNN inactive.")
+            self._frcnn_active = False
 
     def get_model_status_info(self) -> Dict[str, Any]:
         """Returns the current scientific & validation status of the AI model."""
@@ -88,17 +150,32 @@ class VisionService:
             and "red_cherry" in str(self.model.names)
         )
 
-        status_label = (
-            "Trained on Croppie Coffee dataset (Awaiting Coorg local validation)"
-            if has_trained_weights
-            else "Preliminary model (Baseline / Ready to train)"
-        )
-        status_color = "emerald" if has_trained_weights else "amber"
+        frcnn_weights_path = None
+        for c in [
+            Path(settings.BASE_DIR) / "ml" / "weights" / "frcnn_best.pth",
+            Path(settings.BASE_DIR) / "ml" / "weights" / "frcnn_last.pth",
+        ]:
+            if c.exists():
+                frcnn_weights_path = str(c)
+                break
+
+        # Preferred model for status display
+        if self._frcnn_active:
+            status_label = "Faster R-CNN (ResNet50-FPN) — Trained on Croppie Coffee dataset"
+            status_color = "emerald"
+            active_arch  = "Faster R-CNN (ResNet50-FPN)"
+        elif has_trained_weights:
+            status_label = "YOLOv8 — Trained on Croppie Coffee dataset (Awaiting Coorg local validation)"
+            status_color = "emerald"
+            active_arch  = "YOLOv8"
+        else:
+            status_label = "Preliminary model (Baseline / Ready to train)"
+            status_color = "amber"
+            active_arch  = "CV Heuristic"
 
         cuda_avail = False
         device_name = "CPU"
         try:
-            import torch
             cuda_avail = torch.cuda.is_available()
             if cuda_avail:
                 device_name = torch.cuda.get_device_name(0)
@@ -106,10 +183,14 @@ class VisionService:
             pass
 
         return {
-            "model_name": "YOLOv8 Coffee Cherry Detector",
+            "model_name": "Coffee Cherry Detector (Faster R-CNN / YOLOv8)",
             "model_version": self.model_version,
-            "weights_path": self.active_weights_path or settings.DEFAULT_MODEL_PATH,
-            "weights_exist": has_trained_weights,
+            "active_architecture": active_arch,
+            "frcnn_active": self._frcnn_active,
+            "frcnn_weights_path": frcnn_weights_path,
+            "yolo_weights_path": self.active_weights_path or settings.DEFAULT_MODEL_PATH,
+            "weights_path": frcnn_weights_path or self.active_weights_path or settings.DEFAULT_MODEL_PATH,
+            "weights_exist": self._frcnn_active or has_trained_weights,
             "device": device_name,
             "cuda_available": cuda_avail,
             "status_label": status_label,
@@ -119,13 +200,14 @@ class VisionService:
                 "source": "Croppie Coffee Uganda (Alliance Bioversity & CIAT / Producers Direct)",
                 "train_images": 5836,
                 "val_images": 2497,
-                "classes": 5
+                "classes": 5,
+                "split_ratio": "80:20 (Faster R-CNN) / 70:30 (YOLOv8)",
             },
             "detection_parameters": {
                 "confidence_threshold": settings.CONFIDENCE_THRESHOLD,
                 "nms_iou_threshold": settings.IOU_THRESHOLD,
                 "max_detections": settings.MAX_DETECTIONS,
-                "input_resolution": 640
+                "input_resolution": 640,
             },
             "scientific_disclaimer": (
                 "IMPORTANT SCIENTIFIC NOTICE: The public dataset consists of smartphone images collected in Uganda. "
@@ -148,6 +230,11 @@ class VisionService:
         Runs cherry analysis on the provided image:
         - mode='branch': Standard close-up branch inference with individual bounding box annotations.
         - mode='whole_plant': High-resolution tiled canopy inference across the visible plant without bounding boxes.
+
+        Inference priority:
+          1. Faster R-CNN (frcnn_best.pth) — if loaded
+          2. YOLOv8 custom (best.pt with 5 cherry classes) — if loaded
+          3. CV-Heuristic fallback
         """
         if not image_path.exists():
             raise FileNotFoundError(f"Image not found at {image_path}")
@@ -182,48 +269,54 @@ class VisionService:
         detections = []
         counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
 
-        # Check if we have an active custom-trained YOLO model with 5 cherry classes
+        # ── 1. Try Faster R-CNN first ─────────────────────────────────────
         has_custom_yolo = False
-        if self.model is not None:
-            try:
-                if hasattr(self.model, "names") and len(self.model.names) == 5 and "red_cherry" in str(self.model.names):
-                    has_custom_yolo = True
-            except Exception:
-                pass
-
-        if has_custom_yolo:
-            results = self.model.predict(
-                source=str(image_path),
-                conf=confidence_threshold,
-                iou=settings.IOU_THRESHOLD,
-                max_det=settings.MAX_DETECTIONS,
-                verbose=False
+        if self._frcnn_active and self._frcnn_model is not None:
+            detections, counts = self._run_frcnn_inference(
+                img_bgr, width, height, confidence_threshold
             )
-            for r in results:
-                boxes = r.boxes
-                for box in boxes:
-                    cls_id = int(box.cls[0].item())
-                    conf = float(box.conf[0].item())
-                    xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
-                    
-                    x1, y1, x2, y2 = xyxy
-                    w_box = (x2 - x1) / width
-                    h_box = (y2 - y1) / height
-                    xc = (x1 + x2) / (2.0 * width)
-                    yc = (y1 + y2) / (2.0 * height)
-
-                    if cls_id in counts:
-                        counts[cls_id] += 1
-                        detections.append({
-                            "class_id": cls_id,
-                            "class_name": settings.CLASS_NAMES[cls_id],
-                            "confidence": round(conf, 4),
-                            "bbox": [round(xc, 5), round(yc, 5), round(w_box, 5), round(h_box, 5)],
-                            "pixel_coords": [int(x1), int(y1), int(x2), int(y2)]
-                        })
         else:
-            # CV-Heuristic fallback for preliminary mode
-            detections, counts = self._detect_cherries_heuristic(img_bgr, confidence_threshold)
+            # ── 2. YOLOv8 custom weights ──────────────────────────────────
+            if self.model is not None:
+                try:
+                    if hasattr(self.model, "names") and len(self.model.names) == 5 and "red_cherry" in str(self.model.names):
+                        has_custom_yolo = True
+                except Exception:
+                    pass
+
+            if has_custom_yolo:
+                results = self.model.predict(
+                    source=str(image_path),
+                    conf=confidence_threshold,
+                    iou=settings.IOU_THRESHOLD,
+                    max_det=settings.MAX_DETECTIONS,
+                    verbose=False
+                )
+                for r in results:
+                    boxes = r.boxes
+                    for box in boxes:
+                        cls_id = int(box.cls[0].item())
+                        conf = float(box.conf[0].item())
+                        xyxy = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
+                        
+                        x1, y1, x2, y2 = xyxy
+                        w_box = (x2 - x1) / width
+                        h_box = (y2 - y1) / height
+                        xc = (x1 + x2) / (2.0 * width)
+                        yc = (y1 + y2) / (2.0 * height)
+
+                        if cls_id in counts:
+                            counts[cls_id] += 1
+                            detections.append({
+                                "class_id": cls_id,
+                                "class_name": settings.CLASS_NAMES[cls_id],
+                                "confidence": round(conf, 4),
+                                "bbox": [round(xc, 5), round(yc, 5), round(w_box, 5), round(h_box, 5)],
+                                "pixel_coords": [int(x1), int(y1), int(x2), int(y2)]
+                            })
+            else:
+                # ── 3. CV-Heuristic fallback ──────────────────────────────
+                detections, counts = self._detect_cherries_heuristic(img_bgr, confidence_threshold)
 
         # ==========================================
         # STRICT IMAGE CONTENT VALIDATION GUARD
@@ -351,6 +444,65 @@ class VisionService:
             )
         }
 
+    def _run_frcnn_inference(
+        self,
+        img_bgr: np.ndarray,
+        width: int,
+        height: int,
+        confidence_threshold: float,
+    ) -> Tuple[List[Dict[str, Any]], Dict[int, int]]:
+        """
+        Run Faster R-CNN inference on a single BGR image.
+        Returns (detections, counts) in the same format as the YOLO branch.
+        FRCNN labels are 1-indexed (1=dark_brown … 5=yellow); we convert to 0-indexed.
+        """
+        detections: List[Dict[str, Any]] = []
+        counts = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0}
+
+        try:
+            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+            pil_img = Image.fromarray(img_rgb)
+            img_tensor = TF.to_tensor(pil_img).unsqueeze(0).to(self._frcnn_device)
+
+            with torch.no_grad():
+                outputs = self._frcnn_model(img_tensor)
+
+            pred = outputs[0]
+            boxes_t  = pred["boxes"].cpu()
+            scores_t = pred["scores"].cpu()
+            labels_t = pred["labels"].cpu()
+
+            for i in range(len(scores_t)):
+                conf    = float(scores_t[i].item())
+                if conf < confidence_threshold:
+                    continue
+                frcnn_label = int(labels_t[i].item())   # 1-indexed
+                cls_id      = frcnn_label - 1            # 0-indexed
+                if cls_id not in counts:
+                    continue
+
+                x1, y1, x2, y2 = boxes_t[i].tolist()
+                x1 = max(0.0, x1); y1 = max(0.0, y1)
+                x2 = min(float(width), x2); y2 = min(float(height), y2)
+
+                w_box = (x2 - x1) / width
+                h_box = (y2 - y1) / height
+                xc    = (x1 + x2) / (2.0 * width)
+                yc    = (y1 + y2) / (2.0 * height)
+
+                counts[cls_id] += 1
+                detections.append({
+                    "class_id":   cls_id,
+                    "class_name": settings.CLASS_NAMES[cls_id],
+                    "confidence": round(conf, 4),
+                    "bbox": [round(xc, 5), round(yc, 5), round(w_box, 5), round(h_box, 5)],
+                    "pixel_coords": [int(x1), int(y1), int(x2), int(y2)],
+                })
+        except Exception as exc:
+            print(f"[VisionService] FRCNN inference error: {exc}")
+
+        return detections, counts
+
     def _analyze_whole_plant(
         self,
         img_bgr: np.ndarray,
@@ -423,7 +575,23 @@ class VisionService:
             and "red_cherry" in str(self.model.names)
         )
 
-        if has_custom_yolo:
+        if self._frcnn_active and self._frcnn_model is not None:
+            # ── Faster R-CNN tiled inference ───────────────────────────────
+            for x_offset, y_offset, tile_img in tiles:
+                tile_dets, _ = self._run_frcnn_inference(
+                    tile_img, tile_size, tile_size, confidence_threshold * 0.8
+                )
+                for d in tile_dets:
+                    coords = d.get("pixel_coords", [0, 0, 0, 0])
+                    all_boxes.append([
+                        coords[0] + x_offset,
+                        coords[1] + y_offset,
+                        coords[2] + x_offset,
+                        coords[3] + y_offset,
+                        d["confidence"],
+                        d["class_id"],
+                    ])
+        elif has_custom_yolo:
             for i in range(0, len(tiles), batch_size):
                 batch_subset = tiles[i:i + batch_size]
                 batch_imgs = [t[2] for t in batch_subset]

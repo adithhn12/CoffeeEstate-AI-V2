@@ -22,6 +22,9 @@ opencv-python>=4.8.0
 pillow>=10.0.0
 numpy>=1.26.0
 
+# Faster R-CNN evaluation metrics
+torchmetrics>=1.3.0
+
 # Scientific, Linear Programming & Configuration
 scipy>=1.13.0
 pyyaml>=6.0

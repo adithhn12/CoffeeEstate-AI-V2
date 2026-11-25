@@ -58,12 +58,16 @@ datasets/
 *.tar
 *.tar.gz
 
-# Ultralytics Training Runs & Evaluation Artifacts
+# Ultralytics & Faster R-CNN Training Runs & Evaluation Artifacts
 runs/
+ml/runs/
+ml/logs/
 
-# Temporary / Root-level Experiment Weights
+# Model Weights (>100MB GitHub reject limit)
+*.pth
 weights/
 yolo26n.pt
+yolo26s.pt
 
 # Redundant Base YOLO Weights (Trained checkpoint is at ml/weights/best.pt)
 yolov8s.pt
